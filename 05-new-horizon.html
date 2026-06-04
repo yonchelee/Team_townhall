@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>To the New Horizon · Team Town Hall</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --navy:#030B1A; --deep-blue:#0B4F9C; --bright-blue:#1E88FF;
+    --white:#FFFFFF; --accent-glow:rgba(30,136,255,0.5);
+  }
+  html, body { width:100%; height:100%; overflow:hidden; }
+  body {
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",
+                "Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+    color:var(--white); background:var(--navy);
+    background:linear-gradient(to bottom,#030B1A 0%,#06234E 32%,#0B4F9C 64%,
+                               #156FD0 86%,#1E88FF 100%);
+    position:relative;
+  }
+  .stage {
+    position:relative; width:100vw; height:100vh; overflow:hidden;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  /* Ambient glow blobs */
+  .ambient { position:absolute; border-radius:50%; filter:blur(90px);
+    pointer-events:none; z-index:0; }
+  .ambient--1 { width:46vw; height:46vw; top:-12vw; left:-8vw;
+    background:radial-gradient(circle,rgba(30,136,255,0.28),transparent 70%);
+    animation:drift 18s ease-in-out infinite alternate; }
+  .ambient--2 { width:40vw; height:40vw; top:8vh; right:-10vw;
+    background:radial-gradient(circle,rgba(11,79,156,0.45),transparent 70%);
+    animation:drift 22s ease-in-out infinite alternate-reverse; }
+  .ambient--3 { width:70vw; height:38vw; bottom:-14vw; left:15vw;
+    background:radial-gradient(circle,rgba(30,136,255,0.30),transparent 72%);
+    animation:pulseGlow 9s ease-in-out infinite; }
+  @keyframes drift { 0%{transform:translate3d(0,0,0) scale(1);}
+    100%{transform:translate3d(3vw,2vh,0) scale(1.08);} }
+  @keyframes pulseGlow { 0%,100%{opacity:.55;transform:scale(1);}
+    50%{opacity:.9;transform:scale(1.06);} }
+
+  /* AI network overlay */
+  .network { position:absolute; inset:0; width:100%; height:100%;
+    z-index:1; opacity:.16; pointer-events:none; }
+  .network line { stroke:var(--bright-blue); stroke-width:1; }
+  .network circle { fill:var(--bright-blue); }
+  .network .twinkle { animation:nodeTwinkle 4s ease-in-out infinite; }
+  @keyframes nodeTwinkle { 0%,100%{opacity:.3;} 50%{opacity:1;} }
+
+  /* Particles */
+  .particles { position:absolute; inset:0; z-index:1; pointer-events:none; }
+  .particle { position:absolute; width:3px; height:3px; border-radius:50%;
+    background:rgba(255,255,255,.85); box-shadow:0 0 6px 1px var(--accent-glow);
+    opacity:0; animation-name:floatUp,twinkle;
+    animation-timing-function:linear,ease-in-out;
+    animation-iteration-count:infinite,infinite; }
+  @keyframes floatUp { 0%{transform:translateY(0);}
+    100%{transform:translateY(-110vh);} }
+  @keyframes twinkle { 0%,100%{opacity:0;} 15%,85%{opacity:.9;}
+    50%{opacity:.35;} }
+
+  /* Horizon */
+  .horizon { position:absolute; left:0; bottom:16vh; width:100%; height:1px;
+    z-index:2; background:linear-gradient(to right,transparent 0%,
+      rgba(255,255,255,.15) 15%,rgba(255,255,255,.95) 50%,
+      rgba(255,255,255,.15) 85%,transparent 100%);
+    box-shadow:0 0 24px 4px rgba(30,136,255,.65); }
+  .horizon-glow { position:absolute; left:50%; bottom:0;
+    transform:translateX(-50%); width:90vw; height:32vh; z-index:1;
+    background:radial-gradient(ellipse at center bottom,
+      rgba(120,190,255,.55) 0%,rgba(30,136,255,.30) 28%,transparent 70%);
+    filter:blur(10px); pointer-events:none;
+    animation:horizonBreathe 7s ease-in-out infinite; }
+  @keyframes horizonBreathe { 0%,100%{opacity:.7;} 50%{opacity:1;} }
+
+  /* Ghost section number */
+  .ghost-num { position:absolute; top:50%; left:50%;
+    transform:translate(-50%,-56%); font-size:clamp(220px,42vw,640px);
+    font-weight:800; line-height:1; letter-spacing:-.03em;
+    color:rgba(255,255,255,.045); z-index:3; pointer-events:none;
+    user-select:none;
+    opacity:0; animation:ghostIn 1.4s ease forwards; animation-delay:.1s; }
+  @keyframes ghostIn { from{opacity:0;transform:translate(-50%,-50%) scale(.96);}
+    to{opacity:1;transform:translate(-50%,-56%) scale(1);} }
+
+  /* Content */
+  .content { position:relative; z-index:5; width:100%; padding:0 6vw;
+    text-align:center; }
+  .kicker { font-size:clamp(11px,1.05vw,16px); letter-spacing:.5em;
+    text-transform:uppercase; font-weight:600; color:rgba(180,215,255,.9);
+    margin-bottom:3vh; padding-left:.5em;
+    opacity:0; animation:fadeUp 1s ease forwards; animation-delay:.25s; }
+  .headline { font-size:clamp(40px,6vw,104px); font-weight:800;
+    letter-spacing:.02em; line-height:1.06; color:var(--white);
+    text-shadow:0 0 34px rgba(30,136,255,.55),0 0 70px rgba(30,136,255,.25);
+    opacity:0; animation:fadeUp 1.15s cubic-bezier(.22,1,.36,1) forwards;
+    animation-delay:.45s; }
+  .subhead { margin-top:2.6vh; font-size:clamp(15px,1.6vw,24px);
+    font-weight:400; letter-spacing:.02em; color:rgba(214,232,255,.82);
+    opacity:0; animation:fadeUp 1.1s ease forwards; animation-delay:.7s; }
+  .rule { width:0; height:2px; margin:4vh auto 0;
+    background:linear-gradient(to right,transparent,var(--bright-blue),transparent);
+    box-shadow:0 0 14px 2px var(--accent-glow);
+    animation:growRule 1.2s ease forwards; animation-delay:.95s; }
+  @keyframes growRule { to{ width:clamp(200px,26vw,460px); } }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(24px);}
+    to{opacity:1;transform:translateY(0);} }
+
+  /* Navigation */
+  .nav { position:absolute; bottom:4.5vh; left:0; width:100%; z-index:6;
+    display:flex; align-items:center; justify-content:center; gap:24px;
+    opacity:0; animation:fadeUp 1s ease forwards; animation-delay:1.4s; }
+  .nav-btn { display:inline-flex; align-items:center; gap:8px;
+    font-size:clamp(10px,.9vw,13px); letter-spacing:.3em;
+    text-transform:uppercase; text-decoration:none;
+    color:rgba(200,225,255,.7); padding:8px 18px;
+    border:1px solid rgba(255,255,255,.16); border-radius:999px;
+    background:rgba(255,255,255,.05); -webkit-backdrop-filter:blur(8px);
+    backdrop-filter:blur(8px);
+    transition:color .3s ease,border-color .3s ease,background .3s ease; }
+  .nav-btn:hover { color:var(--white); border-color:rgba(30,136,255,.6);
+    background:rgba(30,136,255,.14); }
+  .counter { font-size:clamp(11px,1vw,14px); letter-spacing:.25em;
+    color:rgba(200,225,255,.75); font-variant-numeric:tabular-nums; }
+  .counter b { color:var(--white); font-weight:700; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,*::before,*::after { animation-duration:.001ms !important;
+      animation-iteration-count:1 !important;
+      transition-duration:.001ms !important; }
+    .particle { opacity:.5; }
+    .rule { width:clamp(200px,26vw,460px); }
+    [class]:not(.particle) { opacity:1 !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="ambient ambient--1"></div>
+    <div class="ambient ambient--2"></div>
+    <div class="ambient ambient--3"></div>
+
+    <svg class="network" preserveAspectRatio="xMidYMid slice" viewBox="0 0 1920 1080">
+      <line x1="180" y1="160" x2="520" y2="320" />
+      <line x1="520" y1="320" x2="360" y2="640" />
+      <line x1="520" y1="320" x2="820" y2="240" />
+      <line x1="1740" y1="200" x2="1480" y2="420" />
+      <line x1="1480" y1="420" x2="1620" y2="720" />
+      <line x1="1480" y1="420" x2="1180" y2="320" />
+      <line x1="1620" y1="720" x2="1340" y2="860" />
+      <line x1="360" y1="640" x2="180" y2="880" />
+      <circle class="twinkle" cx="180" cy="160" r="4" style="animation-delay:0s" />
+      <circle class="twinkle" cx="520" cy="320" r="5" style="animation-delay:.6s" />
+      <circle class="twinkle" cx="360" cy="640" r="4" style="animation-delay:1.2s" />
+      <circle class="twinkle" cx="820" cy="240" r="4" style="animation-delay:1.8s" />
+      <circle class="twinkle" cx="1740" cy="200" r="4" style="animation-delay:.9s" />
+      <circle class="twinkle" cx="1480" cy="420" r="5" style="animation-delay:1.5s" />
+      <circle class="twinkle" cx="1620" cy="720" r="4" style="animation-delay:.3s" />
+      <circle class="twinkle" cx="1180" cy="320" r="4" style="animation-delay:2.1s" />
+      <circle class="twinkle" cx="1340" cy="860" r="4" style="animation-delay:1s" />
+      <circle class="twinkle" cx="180" cy="880" r="4" style="animation-delay:1.7s" />
+    </svg>
+
+    <div class="particles" id="particles"></div>
+
+    <div class="horizon-glow"></div>
+    <div class="horizon"></div>
+
+    <div class="ghost-num">05</div>
+
+    <div class="content">
+      <div class="kicker">Agenda 05</div>
+      <h1 class="headline">To the New Horizon</h1>
+      <p class="subhead">Our Next Chapter Begins · 새로운 도약을 향하여</p>
+      <div class="rule"></div>
+    </div>
+
+    <nav class="nav">
+      <a class="nav-btn" href="04-ax-talk.html">&larr; Prev</a>
+      <span class="counter"><b>7</b> / 7</span>
+      <a class="nav-btn" href="index.html">Next &rarr;</a>
+    </nav>
+  </div>
+
+  <script>
+    (function () {
+      var container = document.getElementById('particles');
+      var COUNT = 38, frag = document.createDocumentFragment();
+      for (var i = 0; i < COUNT; i++) {
+        var p = document.createElement('span');
+        p.className = 'particle';
+        var size = Math.random()*2.5+1, floatDur = Math.random()*18+14,
+            twDur = Math.random()*3+2.5;
+        p.style.width = size+'px'; p.style.height = size+'px';
+        p.style.left = (Math.random()*100)+'vw';
+        p.style.top = (Math.random()*100)+'vh';
+        p.style.animationDuration = floatDur+'s, '+twDur+'s';
+        p.style.animationDelay = (-Math.random()*floatDur)+'s, '+(-Math.random()*twDur)+'s';
+        frag.appendChild(p);
+      }
+      container.appendChild(frag);
+    })();
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+        window.location.href = 'index.html';
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        window.location.href = '04-ax-talk.html';
+      }
+    });
+  </script>
+</body>
+</html>

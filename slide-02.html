@@ -261,16 +261,13 @@
     border-color: rgba(30,136,255,0.6);
     background: rgba(30,136,255,0.14);
   }
-  .nav .dots { display: flex; gap: 9px; }
-  .nav .dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.3);
+  .nav .counter {
+    font-size: clamp(11px, 1vw, 14px);
+    letter-spacing: 0.25em;
+    color: rgba(200, 225, 255, 0.75);
+    font-variant-numeric: tabular-nums;
   }
-  .nav .dot.active {
-    background: var(--bright-blue);
-    box-shadow: 0 0 10px 2px var(--accent-glow);
-  }
+  .nav .counter b { color: var(--white); font-weight: 700; }
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
@@ -338,12 +335,9 @@
 
     <!-- Navigation -->
     <nav class="nav">
-      <a href="index.html">← Prev</a>
-      <span class="dots">
-        <span class="dot"></span>
-        <span class="dot active"></span>
-      </span>
-      <a href="index.html">Next →</a>
+      <a href="01-ax-video.html">← Prev</a>
+      <span class="counter"><b>3</b> / 7</span>
+      <a href="02-team-lead.html">Next →</a>
     </nav>
   </div>
 
@@ -372,8 +366,10 @@
 
     // Keyboard navigation between slides.
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-        window.location.href = 'index.html';
+      if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+        window.location.href = '02-team-lead.html';
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        window.location.href = '01-ax-video.html';
       }
     });
   </script>

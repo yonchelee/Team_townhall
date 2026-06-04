@@ -314,6 +314,9 @@
     position: relative;
     display: flex;
     align-items: center;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
     gap: 22px;
     padding: 1.4vh 26px 1.4vh 14px;
     border-radius: 14px;
@@ -459,26 +462,26 @@
       <div class="agenda">
         <div class="agenda-label">Agenda</div>
         <div class="timeline">
-          <div class="agenda-item">
+          <a class="agenda-item" href="01-ax-video.html">
             <div class="num">1</div>
             <div class="agenda-text">AX영상 시청</div>
-          </div>
-          <div class="agenda-item">
+          </a>
+          <a class="agenda-item" href="02-team-lead.html">
             <div class="num">2</div>
             <div class="agenda-text">팀장님 말씀</div>
-          </div>
-          <div class="agenda-item">
+          </a>
+          <a class="agenda-item" href="03-ai-mindset.html">
             <div class="num">3</div>
             <div class="agenda-text">AI MINDSET</div>
-          </div>
-          <div class="agenda-item">
+          </a>
+          <a class="agenda-item" href="04-ax-talk.html">
             <div class="num">4</div>
             <div class="agenda-text">AX TALK</div>
-          </div>
-          <div class="agenda-item">
+          </a>
+          <a class="agenda-item" href="05-new-horizon.html">
             <div class="num">5</div>
             <div class="agenda-text">To the New Horizon</div>
-          </div>
+          </a>
         </div>
       </div>
     </div>
@@ -519,7 +522,7 @@
     // Advance to the next slide with the right arrow / page-down / space.
     document.addEventListener('keydown', function (e) {
       if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
-        window.location.href = 'slide-02.html';
+        window.location.href = '01-ax-video.html';
       }
     });
   </script>
