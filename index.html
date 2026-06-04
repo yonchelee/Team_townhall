@@ -3,424 +3,253 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>NEW HORIZON · Team Town Hall</title>
+<title>NEW HORIZON · 기구개발팀 Team Town Hall</title>
 <style>
-  /* ===== Reset & Base ===== */
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   :root {
-    --navy:        #030B1A;
-    --deep-blue:   #0B4F9C;
-    --bright-blue: #1E88FF;
-    --white:       #FFFFFF;
-    --accent-glow: rgba(30, 136, 255, 0.5);
+    /* Rolex Deepsea D-Blue inspired: rich deep ocean blue fading to black */
+    --navy:#01060F; --deep-blue:#0E448C; --bright-blue:#1E6FD0;
+    --white:#FFFFFF; --accent-glow:rgba(30,111,208,0.45);
   }
 
-  html, body {
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
+  html {
+    scroll-behavior: smooth;
+    scroll-snap-type: y mandatory;
   }
-
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-                 "Helvetica Neue", "Malgun Gothic", "Apple SD Gothic Neo",
-                 "Noto Sans KR", sans-serif;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",
+                "Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
     color: var(--white);
     background: var(--navy);
-    /* Vertical gradient: dark navy (top) -> deep cobalt (mid) -> Samsung blue (bottom) */
-    background: linear-gradient(
-      to bottom,
-      #030B1A 0%,
-      #06234E 32%,
-      #0B4F9C 64%,
-      #156FD0 86%,
-      #1E88FF 100%
-    );
-    position: relative;
   }
 
-  .stage {
-    position: relative;
-    width: 100vw;
-    height: 100vh;
+  /* ===== Fixed backdrop (shared across every slide) ===== */
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
     overflow: hidden;
-    /* Scale the whole composition relative to viewport so a 1920x1080
-       layout fits any screen without scrolling. */
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      #0E448C 0%, #0A356F 24%, #06234E 48%, #04162F 70%, #020C1B 88%, #01060F 100%
+    );
+  }
+  .ambient { position:absolute; border-radius:50%; filter:blur(90px); }
+  .ambient--1 { width:46vw; height:46vw; top:-12vw; left:-8vw;
+    background:radial-gradient(circle,rgba(22,92,180,0.30),transparent 70%);
+    animation:drift 18s ease-in-out infinite alternate; }
+  .ambient--2 { width:40vw; height:40vw; top:8vh; right:-10vw;
+    background:radial-gradient(circle,rgba(8,52,110,0.5),transparent 70%);
+    animation:drift 22s ease-in-out infinite alternate-reverse; }
+  .ambient--3 { width:70vw; height:38vw; bottom:-14vw; left:15vw;
+    background:radial-gradient(circle,rgba(16,74,150,0.32),transparent 72%);
+    animation:pulseGlow 9s ease-in-out infinite; }
+  @keyframes drift { 0%{transform:translate3d(0,0,0) scale(1);}
+    100%{transform:translate3d(3vw,2vh,0) scale(1.08);} }
+  @keyframes pulseGlow { 0%,100%{opacity:.55;transform:scale(1);}
+    50%{opacity:.9;transform:scale(1.06);} }
+
+  .network { position:absolute; inset:0; width:100%; height:100%; opacity:.16; }
+  .network line { stroke:var(--bright-blue); stroke-width:1; }
+  .network circle { fill:var(--bright-blue); }
+  .network .twinkle { animation:nodeTwinkle 4s ease-in-out infinite; }
+  @keyframes nodeTwinkle { 0%,100%{opacity:.3;} 50%{opacity:1;} }
+
+  .particles { position:absolute; inset:0; }
+  .particle { position:absolute; width:3px; height:3px; border-radius:50%;
+    background:rgba(255,255,255,.85); box-shadow:0 0 6px 1px var(--accent-glow);
+    opacity:0; animation-name:floatUp,twinkle;
+    animation-timing-function:linear,ease-in-out;
+    animation-iteration-count:infinite,infinite; }
+  @keyframes floatUp { 0%{transform:translateY(0);} 100%{transform:translateY(-110vh);} }
+  @keyframes twinkle { 0%,100%{opacity:0;} 15%,85%{opacity:.9;} 50%{opacity:.35;} }
+
+  .horizon { position:absolute; left:0; bottom:13vh; width:100%; height:1px;
+    background:linear-gradient(to right,transparent 0%,rgba(255,255,255,.15) 15%,
+      rgba(255,255,255,.95) 50%,rgba(255,255,255,.15) 85%,transparent 100%);
+    box-shadow:0 0 24px 4px rgba(30,136,255,.65); }
+  .horizon-glow { position:absolute; left:50%; bottom:0; transform:translateX(-50%);
+    width:90vw; height:30vh;
+    background:radial-gradient(ellipse at center bottom,rgba(60,140,225,.45) 0%,
+      rgba(20,90,170,.28) 28%,transparent 70%);
+    filter:blur(10px); animation:horizonBreathe 7s ease-in-out infinite; }
+  @keyframes horizonBreathe { 0%,100%{opacity:.7;} 50%{opacity:1;} }
+
+  /* ===== Deck / slides ===== */
+  .slide {
+    position: relative;
+    z-index: 1;
+    min-height: 100dvh;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-  }
-
-  /* ===== Ambient glow blobs ===== */
-  .ambient {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(90px);
-    pointer-events: none;
-    z-index: 0;
-  }
-  .ambient--1 {
-    width: 46vw; height: 46vw;
-    top: -12vw; left: -8vw;
-    background: radial-gradient(circle, rgba(30,136,255,0.28), transparent 70%);
-    animation: drift 18s ease-in-out infinite alternate;
-  }
-  .ambient--2 {
-    width: 40vw; height: 40vw;
-    top: 8vh; right: -10vw;
-    background: radial-gradient(circle, rgba(11,79,156,0.45), transparent 70%);
-    animation: drift 22s ease-in-out infinite alternate-reverse;
-  }
-  .ambient--3 {
-    width: 70vw; height: 38vw;
-    bottom: -14vw; left: 15vw;
-    background: radial-gradient(circle, rgba(30,136,255,0.30), transparent 72%);
-    animation: pulseGlow 9s ease-in-out infinite;
-  }
-
-  @keyframes drift {
-    0%   { transform: translate3d(0, 0, 0) scale(1); }
-    100% { transform: translate3d(3vw, 2vh, 0) scale(1.08); }
-  }
-  @keyframes pulseGlow {
-    0%, 100% { opacity: 0.55; transform: scale(1); }
-    50%      { opacity: 0.9;  transform: scale(1.06); }
-  }
-
-  /* ===== AI network / geometric line overlay ===== */
-  .network {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 1;
-    opacity: 0.18;
-    pointer-events: none;
-  }
-  .network line { stroke: var(--bright-blue); stroke-width: 1; }
-  .network circle { fill: var(--bright-blue); }
-  .network .twinkle {
-    animation: nodeTwinkle 4s ease-in-out infinite;
-  }
-  @keyframes nodeTwinkle {
-    0%, 100% { opacity: 0.3; }
-    50%      { opacity: 1; }
-  }
-
-  /* ===== Particle field ===== */
-  .particles {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    pointer-events: none;
-  }
-  .particle {
-    position: absolute;
-    width: 3px;
-    height: 3px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.85);
-    box-shadow: 0 0 6px 1px var(--accent-glow);
-    opacity: 0;
-    animation-name: floatUp, twinkle;
-    animation-timing-function: linear, ease-in-out;
-    animation-iteration-count: infinite, infinite;
-  }
-  @keyframes floatUp {
-    0%   { transform: translateY(0); }
-    100% { transform: translateY(-110vh); }
-  }
-  @keyframes twinkle {
-    0%, 100% { opacity: 0; }
-    15%, 85% { opacity: 0.9; }
-    50%      { opacity: 0.35; }
-  }
-
-  /* ===== Horizon line & light ===== */
-  .horizon {
-    position: absolute;
-    left: 0;
-    bottom: 16vh;
-    width: 100%;
-    height: 1px;
-    z-index: 2;
-    background: linear-gradient(
-      to right,
-      transparent 0%,
-      rgba(255,255,255,0.15) 15%,
-      rgba(255,255,255,0.95) 50%,
-      rgba(255,255,255,0.15) 85%,
-      transparent 100%
-    );
-    box-shadow: 0 0 24px 4px rgba(30,136,255,0.65);
-  }
-  .horizon-glow {
-    position: absolute;
-    left: 50%;
-    bottom: 0;
-    transform: translateX(-50%);
-    width: 90vw;
-    height: 32vh;
-    z-index: 1;
-    background: radial-gradient(
-      ellipse at center bottom,
-      rgba(120,190,255,0.55) 0%,
-      rgba(30,136,255,0.30) 28%,
-      transparent 70%
-    );
-    filter: blur(10px);
-    pointer-events: none;
-    animation: horizonBreathe 7s ease-in-out infinite;
-  }
-  @keyframes horizonBreathe {
-    0%, 100% { opacity: 0.7; }
-    50%      { opacity: 1; }
-  }
-
-  /* ===== Content layer ===== */
-  .content {
-    position: relative;
-    z-index: 5;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
     text-align: center;
-    width: 100%;
-    height: 100%;
-    padding: 5vh 4vw;
+    padding: 6vh 6vw;
   }
 
-  /* ===== Title ===== */
-  .title-block {
-    margin-top: 7vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-  .eyebrow {
-    font-size: clamp(11px, 1.05vw, 16px);
-    letter-spacing: 0.55em;
-    text-transform: uppercase;
-    font-weight: 600;
-    color: rgba(180, 215, 255, 0.9);
-    margin-bottom: 2.4vh;
-    padding-left: 0.55em;
+  /* ===== Scroll-reveal primitives ===== */
+  .reveal {
     opacity: 0;
-    animation: fadeUp 1s ease forwards;
-    animation-delay: 0.2s;
+    transform: translateY(26px);
+    transition: opacity .9s ease, transform .9s cubic-bezier(.22,1,.36,1);
+    transition-delay: var(--d, 0s);
   }
-  .title {
-    font-size: clamp(52px, 6.0vw, 96px);
-    font-weight: 800;
-    letter-spacing: 0.10em;
-    line-height: 1.02;
-    color: var(--white);
-    text-shadow: 0 0 30px rgba(30,136,255,0.55),
-                 0 0 60px rgba(30,136,255,0.25);
-    opacity: 0;
-    animation: fadeUp 1.1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-    animation-delay: 0.4s;
-  }
-  .at {
-    font-size: clamp(28px, 3.0vw, 48px);
-    font-weight: 300;
-    color: rgba(255, 255, 255, 0.7);
-    margin: 1.6vh 0 0.6vh;
-    opacity: 0;
-    animation: fadeUp 1.1s ease forwards;
-    animation-delay: 0.65s;
-  }
-  .team {
-    font-size: clamp(24px, 2.6vw, 44px);
-    font-weight: 500;
-    letter-spacing: 0.12em;
-    color: var(--white);
-    text-shadow: 0 0 22px rgba(30,136,255,0.45);
-    opacity: 0;
-    animation: fadeUp 1.1s ease forwards;
-    animation-delay: 0.85s;
-  }
-  .title-rule {
-    width: 0;
-    height: 2px;
-    margin-top: 2.6vh;
-    background: linear-gradient(to right, transparent, var(--bright-blue), transparent);
-    box-shadow: 0 0 14px 2px var(--accent-glow);
-    animation: growRule 1.2s ease forwards;
-    animation-delay: 1.05s;
-  }
-  @keyframes growRule {
-    to { width: clamp(160px, 18vw, 320px); }
-  }
+  .slide.in-view .reveal { opacity: 1; transform: none; }
+
+  /* ===== Intro slide ===== */
+  .eyebrow { font-size:clamp(11px,1.05vw,16px); letter-spacing:.55em;
+    text-transform:uppercase; font-weight:600; color:rgba(180,215,255,.9);
+    margin-bottom:2.4vh; padding-left:.55em; }
+  .title { font-size:clamp(52px,6vw,96px); font-weight:800; letter-spacing:.10em;
+    line-height:1.02; color:var(--white);
+    text-shadow:0 0 30px rgba(30,136,255,.55),0 0 60px rgba(30,136,255,.25); }
+  .at { font-size:clamp(28px,3vw,48px); font-weight:300;
+    color:rgba(255,255,255,.7); margin:1.6vh 0 .6vh; }
+  .team { font-size:clamp(24px,2.6vw,44px); font-weight:500; letter-spacing:.12em;
+    color:var(--white); text-shadow:0 0 22px rgba(30,136,255,.45); }
+  .title-rule { width:0; height:2px; margin-top:2.6vh;
+    background:linear-gradient(to right,transparent,var(--bright-blue),transparent);
+    box-shadow:0 0 14px 2px var(--accent-glow);
+    transition:width 1.2s ease .8s; }
+  .slide.in-view .title-rule { width:clamp(160px,18vw,320px); }
 
   /* ===== Agenda timeline ===== */
-  .agenda {
-    margin-top: auto;
-    margin-bottom: 19vh;
-    width: 100%;
-    max-width: 760px;
-    display: flex;
-    flex-direction: column;
-    gap: 1.15vh;
-    position: relative;
-  }
-  .agenda-label {
-    font-size: clamp(11px, 1vw, 14px);
-    letter-spacing: 0.45em;
-    text-transform: uppercase;
-    font-weight: 600;
-    color: rgba(170, 210, 255, 0.85);
-    text-align: center;
-    margin-bottom: 1.6vh;
-    opacity: 0;
-    animation: fadeUp 0.9s ease forwards;
-    animation-delay: 1.1s;
+  .agenda { margin-top:6vh; width:100%; max-width:760px; }
+  .agenda-label { font-size:clamp(11px,1vw,14px); letter-spacing:.45em;
+    text-transform:uppercase; font-weight:600; color:rgba(170,210,255,.85);
+    margin-bottom:1.8vh; }
+  .timeline { position:relative; display:flex; flex-direction:column; gap:1.15vh; }
+  .timeline::before { content:""; position:absolute; left:24px; top:24px; bottom:24px;
+    width:2px; background:linear-gradient(to bottom,rgba(30,136,255,0),
+      rgba(30,136,255,.85) 12%,rgba(30,136,255,.85) 88%,rgba(30,136,255,0));
+    box-shadow:0 0 12px 1px var(--accent-glow);
+    transform-origin:top; transform:scaleY(0); transition:transform 1s ease .3s; }
+  .slide.in-view .timeline::before { transform:scaleY(1); }
+  .agenda-item { position:relative; display:flex; align-items:center;
+    text-decoration:none; color:inherit; cursor:pointer; gap:22px;
+    padding:1.4vh 26px 1.4vh 14px; border-radius:14px;
+    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.14);
+    -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+    box-shadow:0 4px 24px rgba(3,11,26,.35);
+    transition:transform .35s ease, box-shadow .35s ease, border-color .35s ease,
+               background .35s ease, opacity .9s ease; }
+  .agenda-item:hover { transform:translateY(-3px) translateX(4px);
+    background:rgba(30,136,255,.14); border-color:rgba(30,136,255,.6);
+    box-shadow:0 8px 34px rgba(30,136,255,.35),0 0 0 1px rgba(30,136,255,.25); }
+  .num { flex:0 0 auto; width:36px; height:36px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; font-size:16px;
+    font-weight:700; color:var(--white);
+    background:radial-gradient(circle at 35% 30%,#3a9bff,#0B4F9C);
+    border:1px solid rgba(255,255,255,.45); box-shadow:0 0 14px 2px var(--accent-glow);
+    z-index:1; transition:box-shadow .35s ease, transform .35s ease; }
+  .agenda-item:hover .num { box-shadow:0 0 22px 5px rgba(30,136,255,.8);
+    transform:scale(1.08); }
+  .agenda-text { font-size:clamp(16px,1.55vw,24px); font-weight:500;
+    letter-spacing:.02em; color:var(--white); text-align:left; }
+
+  /* ===== Section divider slides ===== */
+  .ghost-num { position:absolute; top:50%; left:50%;
+    transform:translate(-50%,-50%) scale(.96);
+    font-size:clamp(220px,42vw,640px); font-weight:800; line-height:1;
+    letter-spacing:-.03em; color:rgba(255,255,255,.05); z-index:-1;
+    user-select:none; pointer-events:none;
+    opacity:0; transition:opacity 1.2s ease, transform 1.2s ease; }
+  .slide.in-view .ghost-num { opacity:1; transform:translate(-50%,-56%) scale(1); }
+  .kicker { font-size:clamp(11px,1.05vw,16px); letter-spacing:.5em;
+    text-transform:uppercase; font-weight:600; color:rgba(180,215,255,.9);
+    margin-bottom:3vh; padding-left:.5em; }
+  .headline { font-size:clamp(40px,6vw,104px); font-weight:800; letter-spacing:.02em;
+    line-height:1.06; color:var(--white);
+    text-shadow:0 0 34px rgba(30,136,255,.55),0 0 70px rgba(30,136,255,.25); }
+  .subhead { margin-top:2.6vh; font-size:clamp(15px,1.6vw,24px); font-weight:400;
+    letter-spacing:.02em; color:rgba(214,232,255,.82); }
+  .rule { width:0; height:2px; margin:4vh auto 0;
+    background:linear-gradient(to right,transparent,var(--bright-blue),transparent);
+    box-shadow:0 0 14px 2px var(--accent-glow);
+    transition:width 1.1s ease; transition-delay:var(--d,.6s); }
+  .slide.in-view .rule { width:clamp(200px,26vw,460px); }
+
+  /* "Start Bold" transition slide */
+  .phrase { white-space:nowrap; font-size:clamp(30px,5.2vw,88px); font-weight:800;
+    letter-spacing:.02em; line-height:1.1; color:var(--white);
+    text-shadow:0 0 34px rgba(30,136,255,.55),0 0 70px rgba(30,136,255,.25); }
+  .phrase .accent { color:#8FCBFF; text-shadow:0 0 38px rgba(30,136,255,.8); }
+  .phrase .sep { color:rgba(255,255,255,.45); font-weight:300; margin:0 .15em; }
+
+  /* ===== Scroll hint (intro only) ===== */
+  .scroll-hint { position:absolute; bottom:4vh; left:50%; transform:translateX(-50%);
+    font-size:clamp(10px,.85vw,13px); letter-spacing:.3em; text-transform:uppercase;
+    color:rgba(200,225,255,.7); display:flex; flex-direction:column; align-items:center;
+    gap:8px; }
+  .scroll-hint .chev { width:14px; height:14px; border-right:2px solid rgba(200,225,255,.7);
+    border-bottom:2px solid rgba(200,225,255,.7); transform:rotate(45deg);
+    animation:bob 1.8s ease-in-out infinite; }
+  @keyframes bob { 0%,100%{transform:rotate(45deg) translate(0,0); opacity:.5;}
+    50%{transform:rotate(45deg) translate(3px,3px); opacity:1;} }
+
+  /* ===== Progress bar ===== */
+  .progress { position:fixed; top:0; left:0; height:3px; width:0%; z-index:200;
+    background:linear-gradient(90deg,var(--deep-blue),var(--bright-blue));
+    box-shadow:0 0 12px 1px var(--accent-glow); transition:width .12s linear; }
+
+  /* ===== Dot navigation ===== */
+  .nav-dots { position:fixed; right:34px; top:50%; transform:translateY(-50%);
+    display:flex; flex-direction:column; gap:16px; z-index:120; }
+  .nav-dot { width:11px; height:11px; border-radius:50%; background:transparent;
+    border:1.5px solid rgba(180,215,255,.6); cursor:pointer; padding:0;
+    position:relative; transition:all .35s ease; }
+  .nav-dot:hover { border-color:var(--bright-blue); }
+  .nav-dot.active { background:var(--bright-blue); border-color:var(--bright-blue);
+    transform:scale(1.4); box-shadow:0 0 12px 2px var(--accent-glow); }
+  .nav-dot::after { content:attr(data-label); position:absolute; right:24px; top:50%;
+    transform:translateY(-50%); white-space:nowrap; font-size:12px; letter-spacing:.04em;
+    color:rgba(220,236,255,.92); background:rgba(8,28,60,.7);
+    -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+    padding:5px 11px; border-radius:8px; border:1px solid rgba(255,255,255,.12);
+    opacity:0; pointer-events:none; transition:opacity .25s ease; }
+  .nav-dot:hover::after { opacity:1; }
+
+  @media (max-width:760px) {
+    .phrase { white-space:normal; }
+    .nav-dots { right:16px; gap:13px; }
   }
 
-  .timeline {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 1.15vh;
-  }
-  /* Glowing connector line running through the number circles */
-  .timeline::before {
-    content: "";
-    position: absolute;
-    left: 24px;
-    top: 24px;
-    bottom: 24px;
-    width: 2px;
-    background: linear-gradient(
-      to bottom,
-      rgba(30,136,255,0.0),
-      rgba(30,136,255,0.85) 12%,
-      rgba(30,136,255,0.85) 88%,
-      rgba(30,136,255,0.0)
-    );
-    box-shadow: 0 0 12px 1px var(--accent-glow);
-    transform-origin: top;
-    transform: scaleY(0);
-    animation: growLine 1.1s ease forwards;
-    animation-delay: 1.2s;
-  }
-  @keyframes growLine {
-    to { transform: scaleY(1); }
-  }
-
-  .agenda-item {
-    position: relative;
-    display: flex;
-    align-items: center;
-    text-decoration: none;
-    color: inherit;
-    cursor: pointer;
-    gap: 22px;
-    padding: 1.4vh 26px 1.4vh 14px;
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    -webkit-backdrop-filter: blur(12px);
-    backdrop-filter: blur(12px);
-    box-shadow: 0 4px 24px rgba(3, 11, 26, 0.35);
-    opacity: 0;
-    transform: translateY(22px);
-    animation: fadeUp 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-    transition: transform 0.35s ease, box-shadow 0.35s ease,
-                border-color 0.35s ease, background 0.35s ease;
-  }
-  .agenda-item:hover {
-    transform: translateY(-3px) translateX(4px);
-    background: rgba(30, 136, 255, 0.14);
-    border-color: rgba(30, 136, 255, 0.6);
-    box-shadow: 0 8px 34px rgba(30, 136, 255, 0.35),
-                0 0 0 1px rgba(30,136,255,0.25);
-  }
-
-  .num {
-    flex: 0 0 auto;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--white);
-    background: radial-gradient(circle at 35% 30%, #3a9bff, #0B4F9C);
-    border: 1px solid rgba(255, 255, 255, 0.45);
-    box-shadow: 0 0 14px 2px var(--accent-glow);
-    z-index: 1;
-    transition: box-shadow 0.35s ease, transform 0.35s ease;
-  }
-  .agenda-item:hover .num {
-    box-shadow: 0 0 22px 5px rgba(30,136,255,0.8);
-    transform: scale(1.08);
-  }
-
-  .agenda-text {
-    font-size: clamp(16px, 1.55vw, 24px);
-    font-weight: 500;
-    letter-spacing: 0.02em;
-    color: var(--white);
-    text-align: left;
-  }
-
-  /* Stagger the agenda entrance */
-  .agenda-item:nth-child(1) { animation-delay: 1.30s; }
-  .agenda-item:nth-child(2) { animation-delay: 1.45s; }
-  .agenda-item:nth-child(3) { animation-delay: 1.60s; }
-  .agenda-item:nth-child(4) { animation-delay: 1.75s; }
-  .agenda-item:nth-child(5) { animation-delay: 1.90s; }
-
-  /* ===== Shared entrance keyframe ===== */
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(22px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  /* ===== Footer hint ===== */
-  .footer {
-    position: absolute;
-    bottom: 4.5vh;
-    left: 0;
-    width: 100%;
-    text-align: center;
-    z-index: 5;
-    font-size: clamp(10px, 0.9vw, 13px);
-    letter-spacing: 0.35em;
-    text-transform: uppercase;
-    color: rgba(200, 225, 255, 0.65);
-    opacity: 0;
-    animation: fadeUp 1s ease forwards;
-    animation-delay: 2.1s;
-  }
-
-  /* ===== Reduced motion ===== */
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
-      animation-duration: 0.001ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.001ms !important;
-    }
-    .particle { opacity: 0.5; }
-    .title-rule { width: clamp(160px, 18vw, 320px); }
-    .timeline::before { transform: scaleY(1); }
-    [class]:not(.particle) { opacity: 1 !important; }
+    html { scroll-behavior:auto; }
+    *,*::before,*::after { animation-duration:.001ms !important;
+      animation-iteration-count:1 !important; transition-duration:.001ms !important; }
+    .reveal { opacity:1 !important; transform:none !important; }
+    .particle { opacity:.5; }
+    .title-rule { width:clamp(160px,18vw,320px); }
+    .rule { width:clamp(200px,26vw,460px); }
+    .timeline::before { transform:scaleY(1); }
+    .ghost-num { opacity:1; transform:translate(-50%,-56%); }
   }
 </style>
 </head>
 <body>
-  <div class="stage">
-    <!-- Ambient glow blobs -->
+  <!-- Progress + dot nav -->
+  <div class="progress" id="progress"></div>
+  <nav class="nav-dots" id="navDots">
+    <button class="nav-dot" data-target="intro" data-label="NEW HORIZON"></button>
+    <button class="nav-dot" data-target="ax-video" data-label="AX영상 시청"></button>
+    <button class="nav-dot" data-target="start-bold" data-label="Start Bold"></button>
+    <button class="nav-dot" data-target="team-lead" data-label="팀장님 말씀"></button>
+    <button class="nav-dot" data-target="ai-mindset" data-label="AI MINDSET"></button>
+    <button class="nav-dot" data-target="ax-talk" data-label="AX TALK"></button>
+    <button class="nav-dot" data-target="new-horizon" data-label="To the New Horizon"></button>
+  </nav>
+
+  <!-- Shared fixed backdrop -->
+  <div class="backdrop">
     <div class="ambient ambient--1"></div>
     <div class="ambient ambient--2"></div>
     <div class="ambient ambient--3"></div>
-
-    <!-- Faint AI network overlay -->
     <svg class="network" preserveAspectRatio="xMidYMid slice" viewBox="0 0 1920 1080">
       <line x1="180" y1="160" x2="520" y2="320" />
       <line x1="520" y1="320" x2="360" y2="640" />
@@ -431,98 +260,188 @@
       <line x1="1620" y1="720" x2="1340" y2="860" />
       <line x1="360" y1="640" x2="180" y2="880" />
       <circle class="twinkle" cx="180" cy="160" r="4" style="animation-delay:0s" />
-      <circle class="twinkle" cx="520" cy="320" r="5" style="animation-delay:0.6s" />
+      <circle class="twinkle" cx="520" cy="320" r="5" style="animation-delay:.6s" />
       <circle class="twinkle" cx="360" cy="640" r="4" style="animation-delay:1.2s" />
       <circle class="twinkle" cx="820" cy="240" r="4" style="animation-delay:1.8s" />
-      <circle class="twinkle" cx="1740" cy="200" r="4" style="animation-delay:0.9s" />
+      <circle class="twinkle" cx="1740" cy="200" r="4" style="animation-delay:.9s" />
       <circle class="twinkle" cx="1480" cy="420" r="5" style="animation-delay:1.5s" />
-      <circle class="twinkle" cx="1620" cy="720" r="4" style="animation-delay:0.3s" />
+      <circle class="twinkle" cx="1620" cy="720" r="4" style="animation-delay:.3s" />
       <circle class="twinkle" cx="1180" cy="320" r="4" style="animation-delay:2.1s" />
-      <circle class="twinkle" cx="1340" cy="860" r="4" style="animation-delay:1.0s" />
+      <circle class="twinkle" cx="1340" cy="860" r="4" style="animation-delay:1s" />
       <circle class="twinkle" cx="180" cy="880" r="4" style="animation-delay:1.7s" />
     </svg>
-
-    <!-- Particle field (populated by JS) -->
     <div class="particles" id="particles"></div>
-
-    <!-- Horizon light -->
     <div class="horizon-glow"></div>
     <div class="horizon"></div>
+  </div>
 
-    <!-- Main content -->
-    <div class="content">
-      <div class="title-block">
-        <div class="eyebrow">Team Town Hall</div>
-        <h1 class="title">NEW HORIZON</h1>
-        <div class="at">@</div>
-        <div class="team">기구개발팀</div>
-        <div class="title-rule"></div>
-      </div>
+  <!-- ===== Slides ===== -->
+  <main>
+    <!-- 1 · Intro -->
+    <section id="intro" class="slide">
+      <div class="eyebrow reveal" style="--d:.1s">Team Town Hall</div>
+      <h1 class="title reveal" style="--d:.25s">NEW HORIZON</h1>
+      <div class="at reveal" style="--d:.45s">@</div>
+      <div class="team reveal" style="--d:.6s">기구개발팀</div>
+      <div class="title-rule"></div>
 
       <div class="agenda">
-        <div class="agenda-label">Agenda</div>
+        <div class="agenda-label reveal" style="--d:.7s">Agenda</div>
         <div class="timeline">
-          <a class="agenda-item" href="01-ax-video.html">
-            <div class="num">1</div>
-            <div class="agenda-text">AX영상 시청</div>
+          <a class="agenda-item reveal" style="--d:.8s" href="#ax-video">
+            <div class="num">1</div><div class="agenda-text">AX영상 시청</div>
           </a>
-          <a class="agenda-item" href="02-team-lead.html">
-            <div class="num">2</div>
-            <div class="agenda-text">팀장님 말씀</div>
+          <a class="agenda-item reveal" style="--d:.9s" href="#team-lead">
+            <div class="num">2</div><div class="agenda-text">팀장님 말씀</div>
           </a>
-          <a class="agenda-item" href="03-ai-mindset.html">
-            <div class="num">3</div>
-            <div class="agenda-text">AI MINDSET</div>
+          <a class="agenda-item reveal" style="--d:1s" href="#ai-mindset">
+            <div class="num">3</div><div class="agenda-text">AI MINDSET</div>
           </a>
-          <a class="agenda-item" href="04-ax-talk.html">
-            <div class="num">4</div>
-            <div class="agenda-text">AX TALK</div>
+          <a class="agenda-item reveal" style="--d:1.1s" href="#ax-talk">
+            <div class="num">4</div><div class="agenda-text">AX TALK</div>
           </a>
-          <a class="agenda-item" href="05-new-horizon.html">
-            <div class="num">5</div>
-            <div class="agenda-text">To the New Horizon</div>
+          <a class="agenda-item reveal" style="--d:1.2s" href="#new-horizon">
+            <div class="num">5</div><div class="agenda-text">To the New Horizon</div>
           </a>
         </div>
       </div>
-    </div>
 
-    <div class="footer">Future Vision · AI Transformation Journey</div>
-  </div>
+      <div class="scroll-hint reveal" style="--d:1.6s">
+        <span>Scroll</span><span class="chev"></span>
+      </div>
+    </section>
+
+    <!-- 2 · AX영상 시청 -->
+    <section id="ax-video" class="slide">
+      <div class="ghost-num">01</div>
+      <div class="kicker reveal" style="--d:.1s">Agenda 01</div>
+      <h2 class="headline reveal" style="--d:.3s">AX영상 시청</h2>
+      <p class="subhead reveal" style="--d:.55s">AI Transformation in Action · 함께 보는 변화의 시작</p>
+      <div class="rule" style="--d:.7s"></div>
+    </section>
+
+    <!-- 3 · Start Bold (post-video transition) -->
+    <section id="start-bold" class="slide">
+      <div class="kicker reveal" style="--d:.1s">New Horizon</div>
+      <h2 class="phrase reveal" style="--d:.3s">
+        Start <span class="accent">Bold</span><span class="sep">,</span>
+        Move <span class="accent">Fast</span><span class="sep">,</span>
+        Grow <span class="accent">Together</span>
+      </h2>
+      <div class="rule" style="--d:.7s"></div>
+    </section>
+
+    <!-- 4 · 팀장님 말씀 -->
+    <section id="team-lead" class="slide">
+      <div class="ghost-num">02</div>
+      <div class="kicker reveal" style="--d:.1s">Agenda 02</div>
+      <h2 class="headline reveal" style="--d:.3s">팀장님 말씀</h2>
+      <p class="subhead reveal" style="--d:.55s">Leadership Message · 비전과 방향을 함께</p>
+      <div class="rule" style="--d:.7s"></div>
+    </section>
+
+    <!-- 5 · AI MINDSET -->
+    <section id="ai-mindset" class="slide">
+      <div class="ghost-num">03</div>
+      <div class="kicker reveal" style="--d:.1s">Agenda 03</div>
+      <h2 class="headline reveal" style="--d:.3s">AI MINDSET</h2>
+      <p class="subhead reveal" style="--d:.55s">Think AI-First · AI와 함께 일하는 새로운 사고방식</p>
+      <div class="rule" style="--d:.7s"></div>
+    </section>
+
+    <!-- 6 · AX TALK -->
+    <section id="ax-talk" class="slide">
+      <div class="ghost-num">04</div>
+      <div class="kicker reveal" style="--d:.1s">Agenda 04</div>
+      <h2 class="headline reveal" style="--d:.3s">AX TALK</h2>
+      <p class="subhead reveal" style="--d:.55s">Open Conversation · 경험과 생각을 나누는 시간</p>
+      <div class="rule" style="--d:.7s"></div>
+    </section>
+
+    <!-- 7 · To the New Horizon -->
+    <section id="new-horizon" class="slide">
+      <div class="ghost-num">05</div>
+      <div class="kicker reveal" style="--d:.1s">Agenda 05</div>
+      <h2 class="headline reveal" style="--d:.3s">To the New Horizon</h2>
+      <p class="subhead reveal" style="--d:.55s">Our Next Chapter Begins · 새로운 도약을 향하여</p>
+      <div class="rule" style="--d:.7s"></div>
+    </section>
+  </main>
 
   <script>
-    // Generate a subtle field of floating light particles.
+    // ----- Floating particles (generated once on the fixed backdrop) -----
     (function () {
       var container = document.getElementById('particles');
-      var COUNT = 38;
-      var frag = document.createDocumentFragment();
-
+      var COUNT = 40, frag = document.createDocumentFragment();
       for (var i = 0; i < COUNT; i++) {
         var p = document.createElement('span');
         p.className = 'particle';
-
-        var size = Math.random() * 2.5 + 1;          // 1 - 3.5px
-        var left = Math.random() * 100;              // vw
-        var startTop = Math.random() * 100;          // vh, staggered start
-        var floatDur = Math.random() * 18 + 14;      // 14 - 32s rise
-        var twinkleDur = Math.random() * 3 + 2.5;    // 2.5 - 5.5s
-        var delay = -Math.random() * floatDur;       // negative = mid-cycle start
-
+        var size = Math.random() * 2.5 + 1,
+            floatDur = Math.random() * 18 + 14,
+            twDur = Math.random() * 3 + 2.5;
         p.style.width = size + 'px';
         p.style.height = size + 'px';
-        p.style.left = left + 'vw';
-        p.style.top = startTop + 'vh';
-        p.style.animationDuration = floatDur + 's, ' + twinkleDur + 's';
-        p.style.animationDelay = delay + 's, ' + (-Math.random() * twinkleDur) + 's';
-
+        p.style.left = (Math.random() * 100) + 'vw';
+        p.style.top = (Math.random() * 100) + 'vh';
+        p.style.animationDuration = floatDur + 's, ' + twDur + 's';
+        p.style.animationDelay = (-Math.random() * floatDur) + 's, ' + (-Math.random() * twDur) + 's';
         frag.appendChild(p);
       }
       container.appendChild(frag);
     })();
 
-    // Advance to the next slide with the right arrow / page-down / space.
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
-        window.location.href = '01-ax-video.html';
+    var sections = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+    var dots = Array.prototype.slice.call(document.querySelectorAll('.nav-dot'));
+    var progress = document.getElementById('progress');
+    var current = 0;
+
+    // ----- Reveal on scroll + active dot tracking -----
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) {
+          en.target.classList.add('in-view');
+          current = sections.indexOf(en.target);
+          var id = en.target.id;
+          dots.forEach(function (d) {
+            d.classList.toggle('active', d.dataset.target === id);
+          });
+        }
+      });
+    }, { threshold: 0.55 });
+    sections.forEach(function (s) { io.observe(s); });
+
+    // ----- Dot click -> scroll to section -----
+    dots.forEach(function (d) {
+      d.addEventListener('click', function () {
+        var t = document.getElementById(d.dataset.target);
+        if (t) t.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+
+    // ----- Progress bar -----
+    function updateProgress() {
+      var el = document.documentElement;
+      var max = el.scrollHeight - el.clientHeight;
+      progress.style.width = (max > 0 ? (el.scrollTop / max) * 100 : 0) + '%';
+    }
+    window.addEventListener('scroll', updateProgress, { passive: true });
+    updateProgress();
+
+    // ----- Keyboard: advance one section at a time, in order -----
+    function goTo(i) {
+      i = Math.max(0, Math.min(sections.length - 1, i));
+      current = i;
+      sections[i].scrollIntoView({ behavior: 'smooth' });
+    }
+    window.addEventListener('keydown', function (e) {
+      if (['ArrowDown', 'PageDown', ' '].indexOf(e.key) !== -1) {
+        e.preventDefault(); goTo(current + 1);
+      } else if (['ArrowUp', 'PageUp'].indexOf(e.key) !== -1) {
+        e.preventDefault(); goTo(current - 1);
+      } else if (e.key === 'Home') {
+        e.preventDefault(); goTo(0);
+      } else if (e.key === 'End') {
+        e.preventDefault(); goTo(sections.length - 1);
       }
     });
   </script>
