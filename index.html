@@ -515,6 +515,13 @@
       }
       container.appendChild(frag);
     })();
+
+    // Advance to the next slide with the right arrow / page-down / space.
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+        window.location.href = 'slide-02.html';
+      }
+    });
   </script>
 </body>
 </html>
