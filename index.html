@@ -289,16 +289,13 @@
     .panel-grid { gap:14px; }
   }
 
+  /* Respect reduced-motion for content entrances, but keep the ambient
+     background (sparkles, glow, horizon) alive so the slide never looks frozen. */
   @media (prefers-reduced-motion: reduce) {
-    html { scroll-behavior:auto; }
-    *,*::before,*::after { animation-duration:.001ms !important;
-      animation-iteration-count:1 !important; transition-duration:.001ms !important; }
-    .reveal { opacity:1 !important; transform:none !important; }
-    .particle { opacity:.5; }
-    .title-rule { width:clamp(160px,18vw,320px); }
-    .rule { width:clamp(200px,26vw,460px); }
-    .timeline::before { transform:scaleY(1); }
-    .ghost-num { opacity:1; transform:translate(-50%,-56%); }
+    .reveal { opacity:1 !important; transform:none !important; transition:none !important; }
+    .title-rule { width:clamp(160px,18vw,320px) !important; transition:none !important; }
+    .rule { width:clamp(200px,26vw,460px) !important; transition:none !important; }
+    .timeline::before { transform:scaleY(1) !important; transition:none !important; }
   }
 </style>
 </head>
