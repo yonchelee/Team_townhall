@@ -53,7 +53,7 @@
 
   .particles { position:absolute; inset:0; }
   .particle { position:absolute; width:3px; height:3px; border-radius:50%;
-    background:rgba(255,255,255,.98); box-shadow:0 0 9px 2px rgba(125,185,255,.75);
+    background:rgba(255,255,255,1); box-shadow:0 0 12px 2px rgba(140,195,255,.85);
     opacity:0; animation-name:floatUp,twinkle;
     animation-timing-function:linear,ease-in-out;
     animation-iteration-count:infinite,infinite; }
@@ -556,11 +556,14 @@
     // ----- Floating particles (generated once on the fixed backdrop) -----
     (function () {
       var container = document.getElementById('particles');
-      var COUNT = 70, frag = document.createDocumentFragment();
+      // Scale particle count with viewport area so large monitors aren't sparse.
+      var COUNT = Math.min(180, Math.max(70,
+        Math.round(window.innerWidth * window.innerHeight / 16000)));
+      var frag = document.createDocumentFragment();
       for (var i = 0; i < COUNT; i++) {
         var p = document.createElement('span');
         p.className = 'particle';
-        var size = Math.random() * 3 + 1.4,
+        var size = Math.random() * 3.5 + 2,
             floatDur = Math.random() * 18 + 14,
             twDur = Math.random() * 3 + 2.5;
         p.style.width = size + 'px';
