@@ -154,6 +154,14 @@
   .video-note { font-size:clamp(12px,1vw,15px); letter-spacing:.06em;
     color:rgba(200,225,255,.7); }
 
+  /* ===== Embedded page (사내 깃헙 페이지 임베드) ===== */
+  .slide--embed { padding:4vh 3vw; }
+  .embed-wrap { width:min(94vw,1680px); height:min(74vh,920px); margin-top:2vh;
+    border-radius:16px; overflow:hidden; border:1px solid rgba(255,255,255,.18);
+    background:#01060F; position:relative;
+    box-shadow:0 16px 50px rgba(3,11,26,.55), 0 0 30px 2px var(--accent-glow); }
+  .embed-wrap iframe { width:100%; height:100%; border:0; display:block; }
+
   /* ===== Link button (사내 깃헙 연결) ===== */
   .link-btn { display:inline-flex; align-items:center; gap:12px; margin-top:4vh;
     padding:15px 32px; border-radius:999px; text-decoration:none;
@@ -165,6 +173,8 @@
   .link-btn:hover { transform:translateY(-3px); background:rgba(30,111,208,.36);
     box-shadow:0 10px 34px rgba(30,111,208,.45); }
   .link-btn .ext { font-size:1.1em; color:var(--accent-soft); }
+  .link-btn--sm { margin-top:2vh; padding:10px 22px;
+    font-size:clamp(12px,1.05vw,15px); }
   .link-note { margin-top:1.8vh; font-size:clamp(11px,.95vw,14px);
     color:rgba(190,215,255,.55); letter-spacing:.04em; }
 
@@ -334,12 +344,16 @@
     </section>
 
     <!-- 6 · MI파트 발표 -->
-    <section id="mi-part" class="slide">
+    <section id="mi-part" class="slide slide--embed">
       <div class="kicker reveal" style="--d:.1s">05</div>
-      <h2 class="headline reveal" style="--d:.3s">MI파트 발표</h2>
-      <a class="link-btn reveal" style="--d:.55s" href="#" data-needs-url="1"
-         target="_blank" rel="noopener">사내 깃헙 페이지 열기 <span class="ext">&#8599;</span></a>
-      <div class="link-note reveal" style="--d:.7s">링크 주소 연결 필요</div>
+      <h2 class="headline reveal" style="--d:.2s; font-size:clamp(24px,2.6vw,40px)">MI파트 발표</h2>
+      <div class="embed-wrap reveal" style="--d:.35s">
+        <iframe src="https://pages.github.sec.samsung.net/yonche-lee/team_mi"
+                title="MI파트 발표" allow="fullscreen"></iframe>
+      </div>
+      <a class="link-btn link-btn--sm reveal" style="--d:.5s"
+         href="https://pages.github.sec.samsung.net/yonche-lee/team_mi"
+         target="_blank" rel="noopener">새 탭에서 열기 <span class="ext">&#8599;</span></a>
     </section>
 
     <!-- 7 · Q&A -->
