@@ -185,8 +185,10 @@
     box-shadow:0 0 12px 1px var(--accent-glow); transition:width .5s ease; }
 
   /* ===== Dot navigation ===== */
-  .nav-dots { position:fixed; bottom:26px; left:50%; transform:translateX(-50%);
-    display:flex; flex-direction:row; gap:14px; z-index:120; }
+  /* prev + dots + next share one bar pinned to the bottom */
+  .controls { position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    z-index:130; display:flex; align-items:center; gap:22px; }
+  .nav-dots { display:flex; flex-direction:row; align-items:center; gap:14px; }
   .nav-dot { width:11px; height:11px; border-radius:50%;
     background:rgba(4,20,46,.38);
     border:1.5px solid rgba(255,255,255,.92); cursor:pointer; padding:0;
@@ -208,8 +210,8 @@
   .nav-dot:hover::after { opacity:1; }
 
   /* ===== Carousel arrows ===== */
-  .nav-arrow { position:fixed; top:50%; transform:translateY(-50%); z-index:130;
-    width:54px; height:54px; border-radius:50%; cursor:pointer; padding:0;
+  .nav-arrow { flex:0 0 auto;
+    width:46px; height:46px; border-radius:50%; cursor:pointer; padding:0;
     background:rgba(4,20,46,.5); border:1px solid rgba(255,255,255,.45);
     -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
     box-shadow:0 0 0 1px rgba(0,10,26,.45), 0 4px 14px rgba(0,0,0,.3);
@@ -219,16 +221,13 @@
                box-shadow .3s ease; }
   .nav-arrow:hover:not([disabled]) { background:rgba(30,111,208,.26);
     border-color:rgba(30,111,208,.65); box-shadow:0 0 22px 2px var(--accent-glow); }
-  .nav-arrow--prev { left:28px; }
-  .nav-arrow--next { right:28px; }
   .nav-arrow[disabled] { opacity:.2; cursor:default; }
 
   @media (max-width:780px) {
     .phrase { white-space:normal; }
-    .nav-dots { gap:10px; bottom:18px; }
-    .nav-arrow { width:42px; height:42px; font-size:22px; }
-    .nav-arrow--prev { left:10px; }
-    .nav-arrow--next { right:10px; }
+    .controls { bottom:16px; gap:14px; }
+    .nav-dots { gap:9px; }
+    .nav-arrow { width:38px; height:38px; font-size:20px; }
     .panel-grid { gap:14px; }
     .slide { padding:6vh 5vw; }
   }
@@ -246,23 +245,25 @@
 <body>
   <!-- Progress + dot nav -->
   <div class="progress" id="progress"></div>
-  <nav class="nav-dots" id="navDots">
-    <button class="nav-dot" data-target="intro" data-label="소통"></button>
-    <button class="nav-dot" data-target="game" data-label="온라인게임"></button>
-    <button class="nav-dot nav-dot--sub" data-target="game-content" data-label="온라인게임 내용"></button>
-    <button class="nav-dot" data-target="culture" data-label="조직문화 발표"></button>
-    <button class="nav-dot nav-dot--sub" data-target="culture-content" data-label="조직문화 발표 내용"></button>
-    <button class="nav-dot" data-target="video" data-label="영상"></button>
-    <button class="nav-dot nav-dot--sub" data-target="video-content" data-label="영상 재생"></button>
-    <button class="nav-dot" data-target="team-lead" data-label="팀장님 말씀"></button>
-    <button class="nav-dot nav-dot--sub" data-target="team-lead-content" data-label="팀장님 말씀 내용"></button>
-    <button class="nav-dot" data-target="mi-part" data-label="MI파트 발표"></button>
-    <button class="nav-dot nav-dot--sub" data-target="mi-part-content" data-label="MI파트 발표 내용"></button>
-    <button class="nav-dot" data-target="qna" data-label="Q&amp;A"></button>
-    <button class="nav-dot nav-dot--sub" data-target="qna-content" data-label="Q&amp;A 내용"></button>
-  </nav>
-  <button class="nav-arrow nav-arrow--prev" id="prevBtn" aria-label="이전 페이지">&#8249;</button>
-  <button class="nav-arrow nav-arrow--next" id="nextBtn" aria-label="다음 페이지">&#8250;</button>
+  <div class="controls">
+    <button class="nav-arrow nav-arrow--prev" id="prevBtn" aria-label="이전 페이지">&#8249;</button>
+    <nav class="nav-dots" id="navDots">
+      <button class="nav-dot" data-target="intro" data-label="소통"></button>
+      <button class="nav-dot" data-target="game" data-label="온라인게임"></button>
+      <button class="nav-dot nav-dot--sub" data-target="game-content" data-label="온라인게임 내용"></button>
+      <button class="nav-dot" data-target="culture" data-label="조직문화 발표"></button>
+      <button class="nav-dot nav-dot--sub" data-target="culture-content" data-label="조직문화 발표 내용"></button>
+      <button class="nav-dot" data-target="video" data-label="영상"></button>
+      <button class="nav-dot nav-dot--sub" data-target="video-content" data-label="영상 재생"></button>
+      <button class="nav-dot" data-target="team-lead" data-label="팀장님 말씀"></button>
+      <button class="nav-dot nav-dot--sub" data-target="team-lead-content" data-label="팀장님 말씀 내용"></button>
+      <button class="nav-dot" data-target="mi-part" data-label="MI파트 발표"></button>
+      <button class="nav-dot nav-dot--sub" data-target="mi-part-content" data-label="MI파트 발표 내용"></button>
+      <button class="nav-dot" data-target="qna" data-label="Q&amp;A"></button>
+      <button class="nav-dot nav-dot--sub" data-target="qna-content" data-label="Q&amp;A 내용"></button>
+    </nav>
+    <button class="nav-arrow nav-arrow--next" id="nextBtn" aria-label="다음 페이지">&#8250;</button>
+  </div>
 
   <!-- Shared fixed backdrop -->
   <div class="backdrop">
