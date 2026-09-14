@@ -30,7 +30,14 @@
       to bottom,
       #0E448C 0%, #0A356F 24%, #06234E 48%, #04162F 70%, #020C1B 88%, #01060F 100%
     );
+    animation: kenburns 30s ease-in-out infinite alternate;
   }
+  @keyframes kenburns { from { transform:scale(1); } to { transform:scale(1.07); } }
+
+  /* Cinematic vignette: darkens the frame edges like a film print */
+  .vignette { position:fixed; inset:0; z-index:2; pointer-events:none;
+    background: radial-gradient(ellipse at center,
+      transparent 52%, rgba(0,3,10,.30) 78%, rgba(0,3,10,.62) 100%); }
   .ambient { position:absolute; border-radius:50%; filter:blur(90px); }
   .ambient--1 { width:46vw; height:46vw; top:-12vw; left:-8vw;
     background:radial-gradient(circle,rgba(22,92,180,0.30),transparent 70%);
@@ -73,19 +80,23 @@
   @keyframes horizonBreathe { 0%,100%{opacity:.7;} 50%{opacity:1;} }
 
   /* ===== Carousel deck ===== */
-  .deck { position:fixed; inset:0; z-index:1; overflow:hidden; }
-  .track { display:flex; height:100%; width:100%;
-    transition: transform .75s cubic-bezier(.22,1,.36,1); will-change: transform; }
+  .deck { position:fixed; inset:0; z-index:1; overflow:hidden; perspective:1800px; }
+  .track { display:flex; height:100%; width:100%; transform-style:preserve-3d;
+    transition: transform 1.05s cubic-bezier(.76,0,.24,1); will-change: transform; }
   .slide {
     flex: 0 0 100%; width:100%; height:100%;
     position: relative; overflow-y: auto;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     text-align: center; padding: 7vh 6vw;
+    transform-origin: center center; backface-visibility: hidden;
+    will-change: transform, opacity, filter;
+    transition: transform 1.05s cubic-bezier(.76,0,.24,1),
+                opacity .8s ease, filter .8s ease;
   }
 
   /* ===== Scroll-reveal primitives ===== */
-  .reveal { opacity: 0; transform: translateY(26px);
-    transition: opacity .9s ease, transform .9s cubic-bezier(.22,1,.36,1);
+  .reveal { opacity: 0; transform: translateY(30px) scale(.98);
+    transition: opacity 1s ease, transform 1s cubic-bezier(.22,1,.36,1);
     transition-delay: var(--d, 0s); }
   .slide.in-view .reveal { opacity: 1; transform: none; }
 
@@ -371,6 +382,7 @@
     <div class="horizon-glow"></div>
     <div class="horizon"></div>
   </div>
+  <div class="vignette"></div>
 
   <!-- ===== Slides ===== -->
   <main class="deck" id="deck">
@@ -619,6 +631,26 @@
       prevBtn.disabled = (current === 0);
       nextBtn.disabled = (current === TOTAL - 1);
 
+      // Cinematic depth: the focused slide sits forward, sharp and lit;
+      // its neighbours fall back — smaller, dimmer, out of focus, tilted away.
+      slides.forEach(function (sl, i) {
+        var off = i - current, a = Math.abs(off);
+        if (a === 0) {
+          sl.style.transform = 'scale(1) rotateY(0deg)';
+          sl.style.opacity = '1';
+          sl.style.filter = 'none';
+        } else if (a === 1) {
+          sl.style.transform = 'scale(.86) rotateY(' + (off > 0 ? -12 : 12) + 'deg)';
+          sl.style.opacity = '.3';
+          sl.style.filter = 'blur(6px)';
+        } else {
+          // far slides: no blur filter, keeps the GPU cost down
+          sl.style.transform = 'scale(.8)';
+          sl.style.opacity = '0';
+          sl.style.filter = 'none';
+        }
+      });
+
       // play the entrance animation on the slide we landed on
       slides[current].classList.add('in-view');
       // clear the others only after the slide finishes moving, so the
@@ -628,7 +660,7 @@
         slides.forEach(function (sl, i) {
           if (i !== current) sl.classList.remove('in-view');
         });
-      }, 800);
+      }, 1100);
     }
 
     function goTo(i) {
@@ -683,7 +715,7 @@
       var d = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
       if (Math.abs(d) < 12 || wheelLock) return;
       wheelLock = true;
-      setTimeout(function () { wheelLock = false; }, 850);
+      setTimeout(function () { wheelLock = false; }, 1150);
       if (d > 0) next(); else prev();
     }, { passive: true });
 
