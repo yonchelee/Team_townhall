@@ -133,44 +133,6 @@
     box-shadow:0 0 14px 2px var(--accent-glow); transition:width 1.2s ease .8s; }
   .slide.in-view .title-rule { width:clamp(160px,18vw,320px); }
 
-  /* ===== Video placeholder ===== */
-  .video-frame { margin-top:3.6vh; width:min(60vw,720px); aspect-ratio:16/9;
-    border-radius:18px; border:1px solid rgba(255,255,255,.18);
-    background:rgba(255,255,255,.04);
-    -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;
-    overflow:hidden;
-    box-shadow:0 12px 44px rgba(3,11,26,.45), inset 0 0 70px rgba(30,111,208,.08); }
-  .video-frame[data-yt] { cursor:pointer;
-    transition:border-color .3s ease, box-shadow .3s ease, transform .3s ease; }
-  .video-frame[data-yt]:hover { border-color:rgba(30,111,208,.6); transform:translateY(-2px);
-    box-shadow:0 16px 50px rgba(3,11,26,.5), 0 0 32px 3px var(--accent-glow); }
-  .video-frame[data-yt]:hover .play { box-shadow:0 0 30px 5px rgba(30,111,208,.85);
-    background:rgba(30,111,208,.32); }
-  .video-frame iframe { width:100%; height:100%; border:0; display:block; }
-  .video-frame:fullscreen, .video-frame:-webkit-full-screen {
-    width:100vw; height:100vh; max-width:none; aspect-ratio:auto;
-    margin:0; border:0; border-radius:0; background:#000; box-shadow:none; }
-  .play { width:62px; height:62px; border-radius:50%;
-    border:1px solid rgba(255,255,255,.3); display:flex; align-items:center;
-    justify-content:center; background:rgba(30,111,208,.2);
-    box-shadow:0 0 22px 2px var(--accent-glow); }
-  .play::before { content:""; border-left:18px solid rgba(255,255,255,.92);
-    border-top:11px solid transparent; border-bottom:11px solid transparent;
-    margin-left:5px; }
-  .video-note { font-size:clamp(12px,1vw,15px); letter-spacing:.06em;
-    color:rgba(200,225,255,.7); }
-
-  /* ===== Content panel (내용 페이지) ===== */
-  .content-panel { width:min(88vw,1120px); min-height:46vh; margin-top:1vh;
-    border-radius:20px; background:rgba(255,255,255,.05);
-    border:1px solid rgba(255,255,255,.14);
-    -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
-    box-shadow:0 10px 40px rgba(3,11,26,.4);
-    display:flex; align-items:center; justify-content:center; padding:4vh 4vw; }
-  .placeholder-note { font-size:clamp(13px,1.15vw,17px);
-    color:rgba(190,215,255,.42); letter-spacing:.06em; }
-
   /* ===== Embedded page (사내 깃헙 페이지 임베드) ===== */
   /* Full-bleed: the embedded page fills the whole browser window */
   .slide--embed { padding:0; }
@@ -387,13 +349,13 @@
     </section>
 
     <!-- 영상 (내용) -->
-    <section id="video-content" class="slide">
-      <div class="kicker reveal" style="--d:.1s">영상</div>
-      <div class="video-frame reveal" style="--d:.3s" data-yt="qiZAkR8kyuI"
-           role="button" tabindex="0" aria-label="영상 전체화면 재생">
-        <div class="play"></div>
-        <div class="video-note">눌러서 전체화면 재생</div>
+    <section id="video-content" class="slide slide--embed">
+      <div class="embed-wrap">
+        <iframe src="https://pages.github.sec.samsung.net/yonche-lee/team_video" title="영상"
+                allow="autoplay; fullscreen; encrypted-media"></iframe>
       </div>
+      <a class="embed-open" href="https://pages.github.sec.samsung.net/yonche-lee/team_video"
+         target="_blank" rel="noopener">새 탭에서 열기 &#8599;</a>
     </section>
 
     <!-- 팀장님 말씀 (제목) -->
@@ -545,78 +507,6 @@
     dots.forEach(function (d, i) {
       d.addEventListener('click', function () { goTo(i); });
     });
-
-    // ----- Video: click to play fullscreen, return when it ends -----
-    (function () {
-      var ytReady = false, ytQueue = [];
-      window.onYouTubeIframeAPIReady = function () {
-        ytReady = true;
-        ytQueue.forEach(function (fn) { fn(); });
-        ytQueue = [];
-      };
-      function whenYT(fn) { if (ytReady) { fn(); } else { ytQueue.push(fn); } }
-      var tag = document.createElement('script');
-      tag.src = 'https://www.youtube.com/iframe_api';
-      document.head.appendChild(tag);
-
-      function exitFullscreen() {
-        var ex = document.exitFullscreen || document.webkitExitFullscreen;
-        if (ex && (document.fullscreenElement || document.webkitFullscreenElement)) {
-          try { ex.call(document); } catch (e) {}
-        }
-      }
-
-      document.querySelectorAll('.video-frame[data-yt]').forEach(function (frame, n) {
-        var id = frame.dataset.yt;
-        var holderId = 'ytplayer-' + n;
-        var placeholder = frame.innerHTML;
-        var player = null;
-
-        // Put the poster back so the slide looks untouched afterwards
-        function restore() {
-          if (!frame.dataset.playing) return;
-          frame.dataset.playing = '';
-          if (player) { try { player.destroy(); } catch (e) {} player = null; }
-          frame.innerHTML = placeholder;
-        }
-        frame.addEventListener('video-restore', restore);
-
-        function play() {
-          if (frame.dataset.playing) return;
-          frame.dataset.playing = '1';
-          // must be requested inside the click gesture or the browser blocks it
-          var rf = frame.requestFullscreen || frame.webkitRequestFullscreen;
-          if (rf) { try { rf.call(frame); } catch (e) {} }
-          frame.innerHTML = '<div id="' + holderId + '"></div>';
-          whenYT(function () {
-            player = new YT.Player(holderId, {
-              videoId: id,
-              playerVars: { autoplay: 1, rel: 0, modestbranding: 1, playsinline: 1 },
-              events: {
-                onReady: function (e) { e.target.playVideo(); },
-                onStateChange: function (e) {
-                  if (e.data === YT.PlayerState.ENDED) { exitFullscreen(); restore(); }
-                }
-              }
-            });
-          });
-        }
-        frame.addEventListener('click', play);
-        frame.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); play(); }
-        });
-      });
-
-      // Leaving fullscreen by hand (Esc) should also reset the slide
-      ['fullscreenchange', 'webkitfullscreenchange'].forEach(function (evt) {
-        document.addEventListener(evt, function () {
-          if (document.fullscreenElement || document.webkitFullscreenElement) return;
-          document.querySelectorAll('.video-frame[data-playing="1"]').forEach(function (f) {
-            f.dispatchEvent(new CustomEvent('video-restore'));
-          });
-        });
-      });
-    })();
 
     // ----- Keyboard -----
     window.addEventListener('keydown', function (e) {
