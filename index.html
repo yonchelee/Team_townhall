@@ -208,12 +208,17 @@
   /* ===== Dot navigation ===== */
   .nav-dots { position:fixed; bottom:26px; left:50%; transform:translateX(-50%);
     display:flex; flex-direction:row; gap:14px; z-index:120; }
-  .nav-dot { width:11px; height:11px; border-radius:50%; background:transparent;
-    border:1.5px solid rgba(180,215,255,.6); cursor:pointer; padding:0;
-    position:relative; transition:all .35s ease; }
-  .nav-dot:hover { border-color:var(--bright-blue); }
-  .nav-dot.active { background:var(--bright-blue); border-color:var(--bright-blue);
-    transform:scale(1.4); box-shadow:0 0 12px 2px var(--accent-glow); }
+  .nav-dot { width:11px; height:11px; border-radius:50%;
+    background:rgba(4,20,46,.38);
+    border:1.5px solid rgba(255,255,255,.92); cursor:pointer; padding:0;
+    position:relative; transition:all .35s ease;
+    /* dual-tone ring: the white edge reads on dark slides, the dark halo
+       around it reads on white pages such as the embedded MI deck */
+    box-shadow:0 0 0 1.5px rgba(0,10,26,.55), 0 1px 4px rgba(0,0,0,.35); }
+  .nav-dot:hover { background:rgba(30,111,208,.65); border-color:#fff; }
+  .nav-dot.active { background:var(--bright-blue); border-color:#fff;
+    transform:scale(1.4);
+    box-shadow:0 0 0 1.5px rgba(0,10,26,.6), 0 0 12px 2px var(--accent-glow); }
   .nav-dot::after { content:attr(data-label); position:absolute; bottom:24px; left:50%;
     transform:translateX(-50%); white-space:nowrap; font-size:12px; letter-spacing:.04em;
     color:rgba(220,236,255,.92); background:rgba(4,20,46,.78);
@@ -225,9 +230,10 @@
   /* ===== Carousel arrows ===== */
   .nav-arrow { position:fixed; top:50%; transform:translateY(-50%); z-index:130;
     width:54px; height:54px; border-radius:50%; cursor:pointer; padding:0;
-    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.18);
+    background:rgba(4,20,46,.5); border:1px solid rgba(255,255,255,.45);
     -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
-    color:rgba(228,241,255,.92); font-size:26px; line-height:1;
+    box-shadow:0 0 0 1px rgba(0,10,26,.45), 0 4px 14px rgba(0,0,0,.3);
+    color:#fff; font-size:26px; line-height:1;
     display:flex; align-items:center; justify-content:center;
     transition:background .3s ease, border-color .3s ease, opacity .3s ease,
                box-shadow .3s ease; }
