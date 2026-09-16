@@ -170,6 +170,47 @@
     box-shadow:0 0 14px 2px var(--accent-glow); transition:width 1.2s ease .8s; }
   .slide.in-view .title-rule { width:clamp(160px,18vw,320px); }
 
+  /* ===== Roulette (룰렛 게임) ===== */
+  .roulette { display:flex; flex-direction:column; align-items:center; gap:2vh;
+    width:100%; }
+  .wheel-wrap { position:relative; width:min(52vh,44vw,500px); aspect-ratio:1; }
+  .wheel-wrap svg { width:100%; height:100%; display:block;
+    filter:drop-shadow(0 14px 40px rgba(3,11,26,.65)); }
+  #wheel { transform-origin:50% 50%;
+    transition:transform 4.2s cubic-bezier(.12,.72,.02,1); }
+  .pointer { position:absolute; top:-6px; left:50%; transform:translateX(-50%);
+    width:0; height:0; z-index:2;
+    border-left:13px solid transparent; border-right:13px solid transparent;
+    border-top:23px solid #fff;
+    filter:drop-shadow(0 2px 7px rgba(0,0,0,.7)); }
+  .spin-btn { padding:14px 40px; border-radius:999px; cursor:pointer;
+    font-size:clamp(15px,1.4vw,21px); font-weight:700; color:#fff;
+    background:rgba(30,111,208,.3); border:1px solid rgba(30,111,208,.7);
+    -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+    box-shadow:0 6px 26px rgba(3,11,26,.45), 0 0 24px 1px var(--accent-glow);
+    transition:transform .25s ease, background .25s ease, box-shadow .25s ease; }
+  .spin-btn:hover:not([disabled]) { transform:translateY(-2px);
+    background:rgba(30,111,208,.45); box-shadow:0 10px 32px rgba(30,111,208,.5); }
+  .spin-btn[disabled] { opacity:.45; cursor:default; }
+  .winner { min-height:1.5em; font-size:clamp(19px,2.4vw,38px); font-weight:800;
+    letter-spacing:.02em; color:rgba(214,232,255,.75); }
+  .winner b { color:#fff; text-shadow:0 0 26px rgba(30,136,255,.85),
+    0 0 60px rgba(30,136,255,.4); }
+  .roul-opts { display:flex; align-items:center; justify-content:center;
+    flex-wrap:wrap; gap:8px 20px; font-size:clamp(11px,1vw,14px);
+    color:rgba(190,215,255,.7); }
+  .roul-opts label { display:inline-flex; align-items:center; gap:7px;
+    cursor:pointer; }
+  .names-edit { font-size:clamp(11px,1vw,14px); color:rgba(190,215,255,.7); }
+  .names-edit summary { cursor:pointer; letter-spacing:.06em; }
+  .names-edit textarea { display:block; margin:10px auto 0; width:min(78vw,460px);
+    height:96px; resize:vertical; padding:10px 12px; border-radius:12px;
+    font-size:13px; line-height:1.5; color:#fff;
+    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.18); }
+  .names-edit button { margin-top:8px; padding:7px 18px; border-radius:999px;
+    cursor:pointer; font-size:12px; font-weight:600; color:#fff;
+    background:rgba(30,111,208,.28); border:1px solid rgba(30,111,208,.6); }
+
   /* ===== Content panel (내용 페이지) ===== */
   .content-panel { width:min(88vw,1120px); min-height:46vh; margin-top:1vh;
     border-radius:20px; background:rgba(255,255,255,.05);
@@ -307,6 +348,8 @@
       <button class="nav-dot nav-dot--sub" data-target="team-lead-content" data-label="팀장님 말씀 내용"></button>
       <button class="nav-dot" data-target="mi-part" data-label="MI파트 발표"></button>
       <button class="nav-dot nav-dot--sub" data-target="mi-part-content" data-label="MI파트 발표 내용"></button>
+      <button class="nav-dot" data-target="roulette" data-label="룰렛 게임"></button>
+      <button class="nav-dot nav-dot--sub" data-target="roulette-content" data-label="룰렛 추첨"></button>
       <button class="nav-dot" data-target="qna" data-label="Q&amp;A"></button>
       <button class="nav-dot nav-dot--sub" data-target="qna-content" data-label="Q&amp;A 내용"></button>
     </nav>
@@ -444,9 +487,41 @@
          target="_blank" rel="noopener">새 탭에서 열기 &#8599;</a>
     </section>
 
+    <!-- 룰렛 게임 (제목) -->
+    <section id="roulette" class="slide">
+      <div class="kicker reveal" style="--d:.1s">06</div>
+      <h2 class="headline reveal" style="--d:.3s">룰렛 게임</h2>
+      <div class="rule" style="--d:.55s"></div>
+    </section>
+
+    <!-- 룰렛 게임 (내용) -->
+    <section id="roulette-content" class="slide">
+      <div class="roulette">
+        <div class="wheel-wrap reveal" style="--d:.1s">
+          <div class="pointer"></div>
+          <svg viewBox="0 0 200 200" aria-label="룰렛">
+            <g id="wheel"></g>
+            <circle cx="100" cy="100" r="15" fill="#04142E"
+                    stroke="rgba(255,255,255,.55)" stroke-width="1.5" />
+          </svg>
+        </div>
+        <button class="spin-btn reveal" style="--d:.25s" id="spinBtn">돌리기</button>
+        <div class="winner reveal" style="--d:.35s" id="winner">버튼을 눌러 추첨하세요</div>
+        <div class="roul-opts reveal" style="--d:.45s">
+          <label><input type="checkbox" id="removeWinner" checked /> 당첨자 제외</label>
+          <details class="names-edit">
+            <summary>명단 편집</summary>
+            <textarea id="namesBox" spellcheck="false"
+              aria-label="명단 (한 줄에 한 명)"></textarea>
+            <button id="applyNames">적용</button>
+          </details>
+        </div>
+      </div>
+    </section>
+
     <!-- Q&A (제목) -->
     <section id="qna" class="slide">
-      <div class="kicker reveal" style="--d:.1s">06</div>
+      <div class="kicker reveal" style="--d:.1s">07</div>
       <h2 class="headline reveal" style="--d:.3s">Q&amp;A</h2>
       <div class="rule" style="--d:.55s"></div>
     </section>
@@ -564,7 +639,10 @@
 
     // ----- Keyboard -----
     window.addEventListener('keydown', function (e) {
-      if (e.defaultPrevented) return;           // e.g. Space used to play the video
+      if (e.defaultPrevented) return;
+      // never steal keys while someone is typing in the name list
+      var tg = e.target;
+      if (tg && /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName)) return;
       if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].indexOf(e.key) !== -1) {
         e.preventDefault(); next();
       } else if (['ArrowLeft', 'ArrowUp', 'PageUp'].indexOf(e.key) !== -1) {
@@ -598,6 +676,124 @@
         if (dx < 0) next(); else prev();
       }
     }, { passive: true });
+
+    // ----- Roulette wheel -----
+    (function () {
+      var wheel = document.getElementById('wheel');
+      if (!wheel) return;
+      var spinBtn = document.getElementById('spinBtn');
+      var winnerEl = document.getElementById('winner');
+      var namesBox = document.getElementById('namesBox');
+      var applyBtn = document.getElementById('applyNames');
+      var removeChk = document.getElementById('removeWinner');
+
+      // Edit this list, or use 명단 편집 on the slide itself
+      var names = ['참가자 1','참가자 2','참가자 3','참가자 4',
+                   '참가자 5','참가자 6','참가자 7','참가자 8'];
+      var rotation = 0, spinning = false;
+      var SVGNS = 'http://www.w3.org/2000/svg';
+
+      // 0deg = 12 o'clock, angles run clockwise
+      function pointAt(deg, r) {
+        var a = (deg - 90) * Math.PI / 180;
+        return [100 + r * Math.cos(a), 100 + r * Math.sin(a)];
+      }
+
+      function draw() {
+        while (wheel.firstChild) wheel.removeChild(wheel.firstChild);
+        var n = names.length;
+        if (!n) return;
+        var seg = 360 / n;
+        for (var i = 0; i < n; i++) {
+          var a0 = i * seg, a1 = (i + 1) * seg;
+          var p0 = pointAt(a0, 95), p1 = pointAt(a1, 95);
+          var path = document.createElementNS(SVGNS, 'path');
+          path.setAttribute('d',
+            'M100,100 L' + p0[0].toFixed(2) + ',' + p0[1].toFixed(2) +
+            ' A95,95 0 ' + (seg > 180 ? 1 : 0) + ',1 ' +
+            p1[0].toFixed(2) + ',' + p1[1].toFixed(2) + ' Z');
+          path.setAttribute('fill', i % 2 ? '#1E6FD0' : '#0B3A78');
+          path.setAttribute('stroke', 'rgba(255,255,255,.28)');
+          path.setAttribute('stroke-width', '0.6');
+          wheel.appendChild(path);
+
+          var mid = a0 + seg / 2, tp = pointAt(mid, 60);
+          var t = document.createElementNS(SVGNS, 'text');
+          t.setAttribute('x', tp[0].toFixed(2));
+          t.setAttribute('y', tp[1].toFixed(2));
+          t.setAttribute('fill', '#fff');
+          t.setAttribute('font-size', n > 14 ? '5' : n > 9 ? '6.4' : '7.6');
+          t.setAttribute('font-weight', '700');
+          t.setAttribute('text-anchor', 'middle');
+          t.setAttribute('dominant-baseline', 'middle');
+          t.setAttribute('transform', 'rotate(' + mid + ' ' +
+            tp[0].toFixed(2) + ' ' + tp[1].toFixed(2) + ')');
+          t.textContent = names[i].length > 10
+            ? names[i].slice(0, 10) + '…' : names[i];
+          wheel.appendChild(t);
+        }
+        namesBox.value = names.join('\n');
+      }
+
+      function spin() {
+        if (spinning || names.length < 2) return;
+        spinning = true;
+        spinBtn.disabled = true;
+        winnerEl.innerHTML = '추첨 중…';
+        // 5-8 full turns plus a random landing offset
+        rotation += 360 * (5 + Math.floor(Math.random() * 4)) + Math.random() * 360;
+        wheel.style.transform = 'rotate(' + rotation + 'deg)';
+      }
+
+      wheel.addEventListener('transitionend', function () {
+        if (!spinning) return;
+        spinning = false;
+        spinBtn.disabled = false;
+        var n = names.length, seg = 360 / n;
+        // the segment now under the pointer started at angle -rotation
+        var at = ((-rotation % 360) + 360) % 360;
+        var idx = Math.floor(at / seg) % n;
+        var hit = names[idx];
+        winnerEl.innerHTML = '당첨 <b>' + hit + '</b>';
+        if (removeChk.checked && n > 1) {
+          names.splice(idx, 1);
+          setTimeout(function () {
+            rotation = 0;
+            wheel.style.transition = 'none';
+            wheel.style.transform = 'rotate(0deg)';
+            draw();
+            // restore the easing on the next frame
+            requestAnimationFrame(function () {
+              requestAnimationFrame(function () { wheel.style.transition = ''; });
+            });
+          }, 1600);
+        }
+      });
+
+      spinBtn.addEventListener('click', spin);
+      // Space/Enter would also page the carousel — handle it here instead
+      spinBtn.addEventListener('keydown', function (e) {
+        if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); spin(); }
+      });
+
+      applyBtn.addEventListener('click', function () {
+        var list = namesBox.value.split('\n')
+          .map(function (v) { return v.trim(); })
+          .filter(function (v) { return v; });
+        if (list.length < 2) { winnerEl.innerHTML = '두 명 이상 입력해 주세요'; return; }
+        names = list;
+        rotation = 0;
+        wheel.style.transition = 'none';
+        wheel.style.transform = 'rotate(0deg)';
+        draw();
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () { wheel.style.transition = ''; });
+        });
+        winnerEl.innerHTML = '버튼을 눌러 추첨하세요';
+      });
+
+      draw();
+    })();
 
     render();
   </script>
