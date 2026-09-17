@@ -249,7 +249,7 @@
      The radial rotation lives on a wrapping <g>, so this CSS transform is
      free to drive the flap without clobbering it. */
   #wheel text { transform-box:fill-box; transform-origin:center; }
-  #wheel text.flip { animation:flapFlip .56s cubic-bezier(.4,0,.6,1); }
+  #wheel text.flip { animation:flapFlip .4s cubic-bezier(.4,0,.6,1); }
   @keyframes flapFlip {
     0%   { transform:scaleY(1);   opacity:1; }
     42%  { transform:scaleY(.06); opacity:.5; }
@@ -888,13 +888,13 @@
         poolCountEl.textContent = pool.length;
       }
 
-      var labels = [], curCut = 10;
+      var labels = [], curCut = 10, flipTimers = {};
       function clip(nm) {
         return nm.length > curCut ? nm.slice(0, curCut) + '…' : nm;
       }
 
       function draw() {
-        labels = [];
+        labels = []; flipTimers = {};
         while (wheel.firstChild) wheel.removeChild(wheel.firstChild);
         var n = display.length;
         if (!n) {
@@ -1073,13 +1073,22 @@
       function flipLabel(i) {
         var t = labels[i];
         if (!t) return;
+        if (flipTimers[i]) {                // cancel the previous flip's timers
+          clearTimeout(flipTimers[i][0]);
+          clearTimeout(flipTimers[i][1]);
+        }
         t.classList.remove('flip');
         void t.getBoundingClientRect();     // restart the animation
         t.classList.add('flip');
-        setTimeout(function () {
-          if (labels[i] === t && display[i]) t.textContent = clip(display[i].name);
-        }, 235);
-        setTimeout(function () { t.classList.remove('flip'); }, 600);
+        flipTimers[i] = [
+          setTimeout(function () {
+            if (labels[i] === t && display[i]) t.textContent = clip(display[i].name);
+          }, 165),
+          setTimeout(function () {
+            t.classList.remove('flip');
+            delete flipTimers[i];
+          }, 430)
+        ];
       }
 
       function flipSome() {
@@ -1102,7 +1111,7 @@
           flipLabel(slot);
         }
       }
-      setInterval(flipSome, 2200);
+      setInterval(flipSome, 500);
 
       function spin() {
         if (spinning) return;
