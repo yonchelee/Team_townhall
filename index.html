@@ -270,8 +270,6 @@
     letter-spacing:.02em; color:rgba(214,232,255,.75); }
   .winner b { color:#fff; text-shadow:0 0 26px rgba(30,136,255,.85),
     0 0 60px rgba(30,136,255,.4); }
-  .pool-note { font-size:clamp(10px,.92vw,13px); color:rgba(190,215,255,.5);
-    letter-spacing:.04em; }
 
   /* ----- winners, materialising in ----- */
   .winners-list { list-style:none; margin:0; padding:0; overflow-y:auto;
@@ -304,7 +302,7 @@
            box-shadow:0 0 0 0 rgba(150,205,255,0); }
   }
   .winners-list li.teleport::after { content:''; position:absolute;
-    left:0; right:0; top:50%; height:2px; pointer-events:none;
+    left:0; right:0; top:50%; height:2px; pointer-events:none; opacity:0;
     background:linear-gradient(90deg, transparent, #EAF4FF, transparent);
     box-shadow:0 0 16px 5px rgba(150,205,255,.9);
     animation:teleBeam .9s ease-out; }
@@ -657,8 +655,7 @@
             <div class="winner-big" id="winnerBig"></div>
           </div>
           <button class="spin-btn reveal" style="--d:.25s" id="spinBtn">돌리기</button>
-          <div class="winner reveal" style="--d:.3s" id="winner">버튼을 눌러 추첨하세요</div>
-          <div class="pool-note reveal" style="--d:.35s" id="poolNote"></div>
+          <div class="winner reveal" style="--d:.3s" id="winner"></div>
         </div>
 
         <aside class="winners-panel reveal" style="--d:.2s">
@@ -833,7 +830,6 @@
       if (!wheel) return;
       var spinBtn = document.getElementById('spinBtn');
       var winnerEl = document.getElementById('winner');
-      var poolNote = document.getElementById('poolNote');
       var namesBox = document.getElementById('namesBox');
       var applyBtn = document.getElementById('applyNames');
       var removeChk = document.getElementById('removeWinner');
@@ -879,10 +875,6 @@
           }
         }
         poolCountEl.textContent = pool.length;
-        poolNote.textContent = pool.length > MAX_SEG
-          ? '남은 인원 ' + pool.length + '명 중 ' + display.length +
-            '명 표시 · 추첨은 전원 대상'
-          : (pool.length ? '남은 인원 ' + pool.length + '명' : '');
       }
 
       function draw() {
@@ -1036,7 +1028,7 @@
         var won = display[pendingSeg];
         if (!won) {
           wrap.classList.remove('is-spinning');
-          winnerEl.innerHTML = '버튼을 눌러 추첨하세요';
+          winnerEl.innerHTML = '';
           needsResample = true;
           return;
         }
@@ -1115,7 +1107,7 @@
 
       resetBtn.addEventListener('click', function () {
         restore(null);
-        winnerEl.innerHTML = '버튼을 눌러 추첨하세요';
+        winnerEl.innerHTML = '';
       });
 
       spinBtn.addEventListener('click', spin);
@@ -1129,7 +1121,7 @@
           .filter(function (v) { return v; });
         if (list.length < 2) { winnerEl.innerHTML = '두 명 이상 입력해 주세요'; return; }
         restore(list);
-        winnerEl.innerHTML = list.length + '명 등록 완료 · 버튼을 눌러 추첨하세요';
+        winnerEl.innerHTML = list.length + '명 등록 완료';
       });
 
       namesBox.value = basePool.join('\n');
