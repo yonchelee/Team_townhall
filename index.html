@@ -255,18 +255,6 @@
   .link-note { margin-top:1.8vh; font-size:clamp(11px,.95vw,14px);
     color:rgba(190,215,255,.55); letter-spacing:.04em; }
 
-  /* ===== Scroll hint (intro only) ===== */
-  .scroll-hint { position:absolute; bottom:8vh; left:50%; transform:translateX(-50%);
-    font-size:clamp(10px,.85vw,13px); letter-spacing:.3em; text-transform:uppercase;
-    color:rgba(200,225,255,.7); display:flex; flex-direction:row; align-items:center;
-    gap:12px; }
-  .scroll-hint .chev { width:12px; height:12px;
-    border-right:2px solid rgba(200,225,255,.7);
-    border-bottom:2px solid rgba(200,225,255,.7); transform:rotate(-45deg);
-    animation:bob 1.8s ease-in-out infinite; }
-  @keyframes bob { 0%,100%{transform:rotate(-45deg) translate(0,0); opacity:.5;}
-    50%{transform:rotate(-45deg) translate(3px,3px); opacity:1;} }
-
   /* ===== Progress bar ===== */
   .progress { position:fixed; top:0; left:0; height:3px; width:0%; z-index:200;
     background:linear-gradient(90deg,var(--deep-blue),var(--bright-blue));
@@ -402,10 +390,6 @@
       <div class="at reveal" style="--d:.45s">@</div>
       <div class="team reveal" style="--d:.6s">기구개발팀</div>
       <div class="title-rule"></div>
-
-      <div class="scroll-hint reveal" style="--d:1s">
-        <span>Next</span><span class="chev"></span>
-      </div>
     </section>
 
     <!-- 함께하는 게임 (제목) -->
