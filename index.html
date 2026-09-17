@@ -182,8 +182,8 @@
     -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
     box-shadow:0 10px 36px rgba(3,11,26,.45); }
   /* the winner list is the one people read from the back of the room */
-  .winners-panel { width:clamp(260px,20vw,430px); padding:20px 18px; gap:12px; }
-  .winners-panel .panel-title { font-size:clamp(11px,1.15vw,17px);
+  .winners-panel { width:clamp(380px,30vw,640px); padding:26px 24px; gap:14px; }
+  .winners-panel .panel-title { font-size:clamp(16px,1.7vw,25px);
     letter-spacing:.18em; }
   .panel-title { font-size:clamp(10px,.95vw,13px); letter-spacing:.2em;
     text-transform:uppercase; font-weight:700; color:rgba(180,215,255,.9); }
@@ -310,11 +310,11 @@
   /* ----- winners, materialising in ----- */
   .winners-list { list-style:none; margin:0; padding:0; overflow-y:auto;
     flex:1 1 auto; min-height:24vh;
-    display:flex; flex-direction:column; gap:9px; text-align:left; }
-  .winners-list li { position:relative; display:flex; align-items:center; gap:12px;
-    padding:12px 15px; border-radius:13px; background:rgba(30,111,208,.18);
+    display:flex; flex-direction:column; gap:12px; text-align:left; }
+  .winners-list li { position:relative; display:flex; align-items:center; gap:16px;
+    padding:17px 21px; border-radius:16px; background:rgba(30,111,208,.18);
     border:1px solid rgba(30,111,208,.42);
-    font-size:clamp(15px,1.45vw,24px); font-weight:600; }
+    font-size:clamp(22px,2.2vw,36px); font-weight:600; }
   .winners-list li .w-text { flex:1 1 auto; min-width:0; display:flex;
     flex-direction:column; gap:1px; }
   .winners-list li .w-name { font-weight:700; line-height:1.25;
@@ -350,10 +350,10 @@
     animation:teleBeam .9s ease-out; }
   @keyframes teleBeam { 0%{transform:scaleX(.15); opacity:1;}
     55%{opacity:.8;} 100%{transform:scaleX(1); opacity:0;} }
-  .winners-empty { font-size:clamp(12px,1.1vw,17px); color:rgba(190,215,255,.4);
+  .winners-empty { font-size:clamp(16px,1.6vw,25px); color:rgba(190,215,255,.4);
     padding:4px 2px; }
-  .reset-btn { padding:11px 20px; border-radius:999px; cursor:pointer;
-    font-size:clamp(12px,1.05vw,15px); font-weight:600;
+  .reset-btn { padding:14px 26px; border-radius:999px; cursor:pointer;
+    font-size:clamp(14px,1.5vw,22px); font-weight:600;
     color:rgba(220,236,255,.9);
     background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.22);
     transition:background .25s ease, border-color .25s ease, color .25s ease; }
