@@ -175,7 +175,7 @@
   .draw-layout { display:flex; align-items:center; justify-content:center;
     gap:clamp(12px,1.5vw,28px); width:100%; }
   .names-panel, .winners-panel { flex:0 0 auto;
-    width:clamp(186px,16.5vw,262px); max-height:78vh;
+    width:clamp(200px,18vw,300px); max-height:78vh;
     display:flex; flex-direction:column; gap:10px; padding:18px 16px;
     border-radius:18px; background:rgba(255,255,255,.05);
     border:1px solid rgba(255,255,255,.14);
@@ -311,11 +311,12 @@
     padding:9px 12px; border-radius:11px; background:rgba(30,111,208,.18);
     border:1px solid rgba(30,111,208,.42);
     font-size:clamp(13px,1.1vw,17px); font-weight:600; }
-  .winners-list li .w-name { flex:0 1 auto; min-width:0;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .winners-list li .w-dept { flex:0 0 auto; margin-left:auto; padding-left:8px;
-    font-size:.74em; font-weight:500; color:rgba(180,215,255,.72);
-    white-space:nowrap; }
+  .winners-list li .w-text { flex:1 1 auto; min-width:0; display:flex;
+    flex-direction:column; gap:1px; }
+  .winners-list li .w-name { font-weight:700; line-height:1.25;
+    white-space:normal; overflow-wrap:anywhere; }
+  .winners-list li .w-dept { font-size:.74em; font-weight:500; line-height:1.3;
+    color:rgba(180,215,255,.76); white-space:normal; overflow-wrap:anywhere; }
   .winners-list li .no { flex:0 0 auto; width:22px; height:22px; border-radius:50%;
     display:flex; align-items:center; justify-content:center;
     font-size:11px; font-weight:700; background:rgba(255,255,255,.16); }
@@ -1168,16 +1169,19 @@
           no.className = 'no';
           no.textContent = i + 1;
           li.appendChild(no);
+          var tw = document.createElement('span');
+          tw.className = 'w-text';
           var nm = document.createElement('span');
           nm.className = 'w-name';
           nm.textContent = w.n;
-          li.appendChild(nm);
+          tw.appendChild(nm);
           if (w.d) {
             var dp = document.createElement('span');
             dp.className = 'w-dept';
             dp.textContent = w.d;
-            li.appendChild(dp);
+            tw.appendChild(dp);
           }
+          li.appendChild(tw);
           listEl.appendChild(li);
         });
         listEl.scrollTop = listEl.scrollHeight;
