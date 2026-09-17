@@ -170,29 +170,51 @@
     box-shadow:0 0 14px 2px var(--accent-glow); transition:width 1.2s ease .8s; }
   .slide.in-view .title-rule { width:clamp(160px,18vw,320px); }
 
-  /* ===== Roulette (Lucky Draw) ===== */
-  .roulette-layout { display:flex; align-items:center; justify-content:center;
-    gap:3vw; width:100%; }
-  .roulette { display:flex; flex-direction:column; align-items:center; gap:2vh; }
-  .wheel-wrap { position:relative; width:min(50vh,38vw,460px); aspect-ratio:1; }
+  /* ===== Lucky Draw: names | dial | winners ===== */
+  .slide--draw { padding:3vh 2vw; }
+  .draw-layout { display:flex; align-items:center; justify-content:center;
+    gap:clamp(12px,1.5vw,28px); width:100%; }
+  .names-panel, .winners-panel { flex:0 0 auto;
+    width:clamp(186px,16.5vw,262px); max-height:78vh;
+    display:flex; flex-direction:column; gap:10px; padding:18px 16px;
+    border-radius:18px; background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.14);
+    -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+    box-shadow:0 10px 36px rgba(3,11,26,.45); }
+  .panel-title { font-size:clamp(10px,.95vw,13px); letter-spacing:.2em;
+    text-transform:uppercase; font-weight:700; color:rgba(180,215,255,.9); }
+  .panel-title span { color:#fff; }
+
+  .names-panel textarea { flex:1 1 auto; min-height:24vh; resize:vertical;
+    padding:10px 11px; border-radius:12px; font-size:13px; line-height:1.55;
+    color:#fff; background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.18); }
+  .apply-btn { padding:8px 18px; border-radius:999px; cursor:pointer;
+    font-size:12px; font-weight:700; color:#fff;
+    background:rgba(30,111,208,.3); border:1px solid rgba(30,111,208,.65); }
+  .apply-btn:hover { background:rgba(30,111,208,.48); }
+  .opt { display:inline-flex; align-items:center; gap:7px; cursor:pointer;
+    font-size:clamp(10px,.95vw,13px); color:rgba(190,215,255,.75); }
+
+  /* ----- the dial, sized to fill the middle column ----- */
+  .roulette { flex:1 1 0; min-width:0; display:flex; flex-direction:column;
+    align-items:center; gap:1.3vh; }
+  .wheel-wrap { position:relative; width:min(74vh,100%); aspect-ratio:1; }
   .wheel-wrap svg { width:100%; height:100%; display:block;
     filter:drop-shadow(0 14px 40px rgba(3,11,26,.7))
            drop-shadow(0 0 22px rgba(40,120,220,.28)); }
-  /* nebula halo behind the dial, brighter while it spins */
   .wheel-glow { position:absolute; inset:-9%; border-radius:50%; pointer-events:none;
     background:radial-gradient(circle, rgba(70,150,255,.34) 0%,
       rgba(70,150,255,.12) 46%, transparent 70%);
     filter:blur(20px); opacity:.65;
     transition:opacity .6s ease, transform .6s ease; }
   .wheel-wrap.is-spinning .wheel-glow { opacity:1; transform:scale(1.06); }
-  /* light burst from the hub when a name lands */
   #flash { opacity:0; transform-origin:100px 100px; pointer-events:none; }
   .wheel-wrap.is-won #flash { animation:flashOut .95s ease-out; }
   @keyframes flashOut { 0%{opacity:.9; transform:scale(.2);}
     100%{opacity:0; transform:scale(1);} }
   #wheel { transform-origin:50% 50%;
     transition:transform 4.2s cubic-bezier(.12,.72,.02,1); }
-  /* slim luminous needle instead of a flat triangle */
   .pointer { position:absolute; top:-15px; left:50%; transform:translateX(-50%);
     width:18px; height:32px; z-index:3; pointer-events:none; }
   .pointer::before { content:''; position:absolute; left:50%; top:6px;
@@ -204,8 +226,9 @@
   .pointer::after { content:''; position:absolute; left:50%; top:0;
     transform:translateX(-50%); width:8px; height:8px; border-radius:50%;
     background:#fff; box-shadow:0 0 12px 3px rgba(150,205,255,.95); }
-  .spin-btn { padding:14px 40px; border-radius:999px; cursor:pointer;
-    font-size:clamp(15px,1.4vw,21px); font-weight:700; color:#fff;
+
+  .spin-btn { padding:12px 36px; border-radius:999px; cursor:pointer;
+    font-size:clamp(14px,1.3vw,20px); font-weight:700; color:#fff;
     background:rgba(30,111,208,.3); border:1px solid rgba(30,111,208,.7);
     -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
     box-shadow:0 6px 26px rgba(3,11,26,.45), 0 0 24px 1px var(--accent-glow);
@@ -213,51 +236,52 @@
   .spin-btn:hover:not([disabled]) { transform:translateY(-2px);
     background:rgba(30,111,208,.45); box-shadow:0 10px 32px rgba(30,111,208,.5); }
   .spin-btn[disabled] { opacity:.45; cursor:default; }
-  .winner { min-height:1.5em; font-size:clamp(19px,2.4vw,38px); font-weight:800;
+  .winner { min-height:1.4em; font-size:clamp(18px,2.2vw,34px); font-weight:800;
     letter-spacing:.02em; color:rgba(214,232,255,.75); }
   .winner b { color:#fff; text-shadow:0 0 26px rgba(30,136,255,.85),
     0 0 60px rgba(30,136,255,.4); }
-  .roul-opts { display:flex; align-items:center; justify-content:center;
-    flex-wrap:wrap; gap:8px 20px; font-size:clamp(11px,1vw,14px);
-    color:rgba(190,215,255,.7); }
-  .roul-opts label { display:inline-flex; align-items:center; gap:7px;
-    cursor:pointer; }
-  .names-edit { font-size:clamp(11px,1vw,14px); color:rgba(190,215,255,.7); }
-  .names-edit summary { cursor:pointer; letter-spacing:.06em; }
-  .names-edit textarea { display:block; margin:10px auto 0; width:min(78vw,460px);
-    height:96px; resize:vertical; padding:10px 12px; border-radius:12px;
-    font-size:13px; line-height:1.5; color:#fff;
-    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.18); }
-  .names-edit button { margin-top:8px; padding:7px 18px; border-radius:999px;
-    cursor:pointer; font-size:12px; font-weight:600; color:#fff;
-    background:rgba(30,111,208,.28); border:1px solid rgba(30,111,208,.6); }
+  .pool-note { font-size:clamp(10px,.92vw,13px); color:rgba(190,215,255,.5);
+    letter-spacing:.04em; }
 
-  /* winner list on the right, reset at its foot */
-  .winners-panel { width:min(30vw,300px); max-height:64vh;
-    display:flex; flex-direction:column; gap:12px; padding:20px 18px;
-    border-radius:18px; background:rgba(255,255,255,.05);
-    border:1px solid rgba(255,255,255,.14);
-    -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
-    box-shadow:0 10px 36px rgba(3,11,26,.45); }
-  .winners-title { font-size:clamp(11px,1.02vw,15px); letter-spacing:.22em;
-    text-transform:uppercase; font-weight:700; color:rgba(180,215,255,.9); }
-  .winners-title span { color:#fff; }
-  .winners-list { list-style:none; margin:0; padding:0; overflow-y:auto; flex:1;
-    display:flex; flex-direction:column; gap:8px; text-align:left; min-height:6em; }
-  .winners-list li { display:flex; align-items:center; gap:10px; padding:9px 12px;
-    border-radius:11px; background:rgba(30,111,208,.18);
+  /* ----- winners, materialising in ----- */
+  .winners-list { list-style:none; margin:0; padding:0; overflow-y:auto;
+    flex:1 1 auto; min-height:24vh;
+    display:flex; flex-direction:column; gap:8px; text-align:left; }
+  .winners-list li { position:relative; display:flex; align-items:center; gap:10px;
+    padding:9px 12px; border-radius:11px; background:rgba(30,111,208,.18);
     border:1px solid rgba(30,111,208,.42);
-    font-size:clamp(13px,1.1vw,17px); font-weight:600;
-    animation:winPop .45s cubic-bezier(.22,1,.36,1); }
+    font-size:clamp(13px,1.1vw,17px); font-weight:600; }
   .winners-list li .no { flex:0 0 auto; width:22px; height:22px; border-radius:50%;
     display:flex; align-items:center; justify-content:center;
     font-size:11px; font-weight:700; background:rgba(255,255,255,.16); }
-  @keyframes winPop { from{opacity:0; transform:translateX(14px) scale(.96);}
-    to{opacity:1; transform:none;} }
+  /* teleport: a flat beam of light that stretches open and settles */
+  .winners-list li.teleport { animation:teleportIn .9s cubic-bezier(.2,.8,.2,1); }
+  @keyframes teleportIn {
+    0%   { opacity:0; transform:scaleY(.05) scaleX(1.3);
+           filter:brightness(3.2) blur(3px);
+           box-shadow:0 0 28px 9px rgba(150,205,255,.95); }
+    18%  { opacity:1; transform:scaleY(.1) scaleX(1.16);
+           filter:brightness(2.8) blur(1.8px); }
+    34%  { transform:scaleY(1.2) scaleX(.95);
+           filter:brightness(2) blur(.7px);
+           box-shadow:0 0 22px 6px rgba(150,205,255,.8); }
+    48%  { opacity:.45; transform:scaleY(.88) scaleX(1.04);
+           filter:brightness(2.4) blur(1.1px); }
+    62%  { opacity:1; transform:scaleY(1.08) scaleX(.99);
+           filter:brightness(1.4) blur(0); }
+    76%  { opacity:.75; transform:scaleY(.97); }
+    100% { opacity:1; transform:none; filter:none;
+           box-shadow:0 0 0 0 rgba(150,205,255,0); }
+  }
+  .winners-list li.teleport::after { content:''; position:absolute;
+    left:0; right:0; top:50%; height:2px; pointer-events:none;
+    background:linear-gradient(90deg, transparent, #EAF4FF, transparent);
+    box-shadow:0 0 16px 5px rgba(150,205,255,.9);
+    animation:teleBeam .9s ease-out; }
+  @keyframes teleBeam { 0%{transform:scaleX(.15); opacity:1;}
+    55%{opacity:.8;} 100%{transform:scaleX(1); opacity:0;} }
   .winners-empty { font-size:clamp(11px,1vw,14px); color:rgba(190,215,255,.4);
     padding:4px 2px; }
-  .pool-note { font-size:clamp(10px,.92vw,13px); color:rgba(190,215,255,.5);
-    letter-spacing:.04em; }
   .reset-btn { padding:9px 18px; border-radius:999px; cursor:pointer;
     font-size:12px; font-weight:600; color:rgba(220,236,255,.9);
     background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.22);
@@ -265,9 +289,12 @@
   .reset-btn:hover { background:rgba(214,64,64,.28);
     border-color:rgba(214,64,64,.6); color:#fff; }
 
-  @media (max-width:900px) {
-    .roulette-layout { flex-direction:column; gap:2.4vh; }
-    .winners-panel { width:min(86vw,420px); max-height:30vh; }
+  @media (max-width:1100px) {
+    .draw-layout { flex-wrap:wrap; }
+    .names-panel, .winners-panel { width:min(46vw,300px); max-height:34vh; }
+    .roulette { flex:1 1 100%; order:-1; }
+    .wheel-wrap { width:min(46vh,86vw); }
+    .names-panel textarea, .winners-list { min-height:14vh; }
   }
 
   /* ===== Content panel (내용 페이지) ===== */
@@ -539,76 +566,74 @@
     </section>
 
     <!-- Lucky Draw (내용) -->
-    <section id="roulette-content" class="slide">
-      <div class="roulette-layout">
-      <div class="roulette">
-        <div class="wheel-wrap reveal" style="--d:.1s" id="wheelWrap">
-          <div class="wheel-glow"></div>
-          <div class="pointer"></div>
-          <svg viewBox="0 0 200 200" aria-label="돌림판">
-            <defs>
-              <radialGradient id="segA" cx="50%" cy="50%" r="52%">
-                <stop offset="0%" stop-color="#2C6FC8" />
-                <stop offset="100%" stop-color="#09254F" />
-              </radialGradient>
-              <radialGradient id="segB" cx="50%" cy="50%" r="52%">
-                <stop offset="0%" stop-color="#1B7E8C" />
-                <stop offset="100%" stop-color="#07223F" />
-              </radialGradient>
-              <radialGradient id="segC" cx="50%" cy="50%" r="52%">
-                <stop offset="0%" stop-color="#4A56B8" />
-                <stop offset="100%" stop-color="#0B1C45" />
-              </radialGradient>
-              <radialGradient id="hubG" cx="42%" cy="36%" r="70%">
-                <stop offset="0%" stop-color="#BFDDFF" />
-                <stop offset="45%" stop-color="#2A6FC4" />
-                <stop offset="100%" stop-color="#04142E" />
-              </radialGradient>
-              <radialGradient id="flashG" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stop-color="#EAF4FF" stop-opacity=".95" />
-                <stop offset="60%" stop-color="#5FA8FF" stop-opacity=".35" />
-                <stop offset="100%" stop-color="#5FA8FF" stop-opacity="0" />
-              </radialGradient>
-            </defs>
+    <section id="roulette-content" class="slide slide--draw">
+      <div class="draw-layout">
+        <aside class="names-panel reveal" style="--d:.15s">
+          <div class="panel-title">명단 <span id="poolCount">0</span></div>
+          <textarea id="namesBox" spellcheck="false"
+            aria-label="명단 (한 줄에 한 명)"></textarea>
+          <button class="apply-btn" id="applyNames">적용</button>
+          <label class="opt"><input type="checkbox" id="removeWinner" checked /> 당첨자 제외</label>
+        </aside>
 
-            <g id="wheel"></g>
+        <div class="roulette">
+          <div class="wheel-wrap reveal" style="--d:.1s" id="wheelWrap">
+            <div class="wheel-glow"></div>
+            <div class="pointer"></div>
+            <svg viewBox="0 0 200 200" aria-label="돌림판">
+              <defs>
+                <radialGradient id="segA" cx="50%" cy="50%" r="52%">
+                  <stop offset="0%" stop-color="#2C6FC8" />
+                  <stop offset="100%" stop-color="#09254F" />
+                </radialGradient>
+                <radialGradient id="segB" cx="50%" cy="50%" r="52%">
+                  <stop offset="0%" stop-color="#1B7E8C" />
+                  <stop offset="100%" stop-color="#07223F" />
+                </radialGradient>
+                <radialGradient id="segC" cx="50%" cy="50%" r="52%">
+                  <stop offset="0%" stop-color="#4A56B8" />
+                  <stop offset="100%" stop-color="#0B1C45" />
+                </radialGradient>
+                <radialGradient id="hubG" cx="42%" cy="36%" r="70%">
+                  <stop offset="0%" stop-color="#BFDDFF" />
+                  <stop offset="45%" stop-color="#2A6FC4" />
+                  <stop offset="100%" stop-color="#04142E" />
+                </radialGradient>
+                <radialGradient id="flashG" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="#EAF4FF" stop-opacity=".95" />
+                  <stop offset="60%" stop-color="#5FA8FF" stop-opacity=".35" />
+                  <stop offset="100%" stop-color="#5FA8FF" stop-opacity="0" />
+                </radialGradient>
+              </defs>
 
-            <!-- fixed bezel: rings and tick marks, like a star-chart dial -->
-            <g id="bezel">
-              <circle cx="100" cy="100" r="99" fill="none"
-                      stroke="rgba(120,190,255,.16)" stroke-width="1.4" />
-              <circle cx="100" cy="100" r="95.6" fill="none"
-                      stroke="rgba(255,255,255,.22)" stroke-width="0.7" />
-              <circle cx="100" cy="100" r="88" fill="none"
-                      stroke="rgba(255,255,255,.10)" stroke-width="0.5" />
-            </g>
+              <g id="wheel"></g>
 
-            <circle cx="100" cy="100" r="18" fill="url(#hubG)"
-                    stroke="rgba(255,255,255,.45)" stroke-width="1.1" />
-            <circle cx="100" cy="100" r="5.5" fill="#EAF4FF" opacity=".92" />
+              <g id="bezel">
+                <circle cx="100" cy="100" r="99" fill="none"
+                        stroke="rgba(120,190,255,.16)" stroke-width="1.4" />
+                <circle cx="100" cy="100" r="95.6" fill="none"
+                        stroke="rgba(255,255,255,.22)" stroke-width="0.7" />
+                <circle cx="100" cy="100" r="88" fill="none"
+                        stroke="rgba(255,255,255,.10)" stroke-width="0.5" />
+              </g>
 
-            <circle id="flash" cx="100" cy="100" r="95" fill="url(#flashG)" />
-          </svg>
+              <circle cx="100" cy="100" r="18" fill="url(#hubG)"
+                      stroke="rgba(255,255,255,.45)" stroke-width="1.1" />
+              <circle cx="100" cy="100" r="5.5" fill="#EAF4FF" opacity=".92" />
+
+              <circle id="flash" cx="100" cy="100" r="95" fill="url(#flashG)" />
+            </svg>
+          </div>
+          <button class="spin-btn reveal" style="--d:.25s" id="spinBtn">돌리기</button>
+          <div class="winner reveal" style="--d:.3s" id="winner">버튼을 눌러 추첨하세요</div>
+          <div class="pool-note reveal" style="--d:.35s" id="poolNote"></div>
         </div>
-        <button class="spin-btn reveal" style="--d:.25s" id="spinBtn">돌리기</button>
-        <div class="winner reveal" style="--d:.35s" id="winner">버튼을 눌러 추첨하세요</div>
-        <div class="pool-note reveal" style="--d:.4s" id="poolNote"></div>
-        <div class="roul-opts reveal" style="--d:.45s">
-          <label><input type="checkbox" id="removeWinner" checked /> 당첨자 제외</label>
-          <details class="names-edit">
-            <summary>명단 편집</summary>
-            <textarea id="namesBox" spellcheck="false"
-              aria-label="명단 (한 줄에 한 명)"></textarea>
-            <button id="applyNames">적용</button>
-          </details>
-        </div>
-      </div>
 
-      <aside class="winners-panel reveal" style="--d:.2s">
-        <div class="winners-title">당첨자 <span id="winCount">0</span></div>
-        <ol class="winners-list" id="winnersList"></ol>
-        <button class="reset-btn" id="resetBtn">초기화</button>
-      </aside>
+        <aside class="winners-panel reveal" style="--d:.2s">
+          <div class="panel-title">당첨자 <span id="winCount">0</span></div>
+          <ol class="winners-list" id="winnersList"></ol>
+          <button class="reset-btn" id="resetBtn">초기화</button>
+        </aside>
       </div>
     </section>
 
@@ -784,11 +809,12 @@
       var countEl = document.getElementById('winCount');
       var resetBtn = document.getElementById('resetBtn');
       var wrap = document.getElementById('wheelWrap');
+      var poolCountEl = document.getElementById('poolCount');
 
       // A wheel can only carry so many legible labels. With a bigger roster we
       // show a random handful, but the draw stays uniform over everyone:
       // sample MAX_SEG entrants at random, then land on one of them at random.
-      var MAX_SEG = 16;
+      var MAX_SEG = 28;
       var SVGNS = 'http://www.w3.org/2000/svg';
 
       var basePool = ['참가자 1','참가자 2','참가자 3','참가자 4',
@@ -818,6 +844,7 @@
             display.push({ name: pool[r], idx: r });
           }
         }
+        poolCountEl.textContent = pool.length;
         poolNote.textContent = pool.length > MAX_SEG
           ? '남은 인원 ' + pool.length + '명 중 ' + display.length +
             '명 표시 · 추첨은 전원 대상'
@@ -838,8 +865,8 @@
           return;
         }
         var seg = 360 / n;
-        var fs = n <= 8 ? 7.6 : n <= 12 ? 6.4 : 5.6;
-        var cut = n <= 8 ? 10 : n <= 12 ? 8 : 6;
+        var fs = n <= 10 ? 6.2 : n <= 18 ? 5.2 : 4.5;
+        var cut = n <= 10 ? 12 : n <= 18 ? 9 : 7;
         for (var i = 0; i < n; i++) {
           var a0 = i * seg, a1 = (i + 1) * seg;
           var p0 = pointAt(a0, 95), p1 = pointAt(a1, 95);
@@ -855,17 +882,25 @@
           path.setAttribute('stroke-width', '0.5');
           wheel.appendChild(path);
 
-          var mid = a0 + seg / 2, tp = pointAt(mid, 60);
+          var mid = a0 + seg / 2, tp = pointAt(mid, 32);
+          var tx = tp[0].toFixed(2), ty = tp[1].toFixed(2);
           var t = document.createElementNS(SVGNS, 'text');
-          t.setAttribute('x', tp[0].toFixed(2));
-          t.setAttribute('y', tp[1].toFixed(2));
-          t.setAttribute('fill', '#fff');
+          t.setAttribute('x', tx);
+          t.setAttribute('y', ty);
+          t.setAttribute('fill', '#EAF4FF');
           t.setAttribute('font-size', String(fs));
           t.setAttribute('font-weight', '700');
-          t.setAttribute('text-anchor', 'middle');
           t.setAttribute('dominant-baseline', 'middle');
-          t.setAttribute('transform', 'rotate(' + mid + ' ' +
-            tp[0].toFixed(2) + ' ' + tp[1].toFixed(2) + ')');
+          // Lay names along the radius, not across the slice: the arc runs out
+          // of room as segments multiply, the radius does not. Flip on the left
+          // half so every name still reads left-to-right.
+          if (mid <= 180) {
+            t.setAttribute('text-anchor', 'start');
+            t.setAttribute('transform', 'rotate(' + (mid - 90) + ' ' + tx + ' ' + ty + ')');
+          } else {
+            t.setAttribute('text-anchor', 'end');
+            t.setAttribute('transform', 'rotate(' + (mid + 90) + ' ' + tx + ' ' + ty + ')');
+          }
           var nm = display[i].name;
           t.textContent = nm.length > cut ? nm.slice(0, cut) + '…' : nm;
           wheel.appendChild(t);
@@ -889,7 +924,7 @@
         }
       }
 
-      function renderWinners() {
+      function renderWinners(teleportLast) {
         countEl.textContent = winners.length;
         listEl.innerHTML = '';
         if (!winners.length) {
@@ -901,6 +936,7 @@
         }
         winners.forEach(function (w, i) {
           var li = document.createElement('li');
+          if (teleportLast && i === winners.length - 1) li.className = 'teleport';
           var no = document.createElement('span');
           no.className = 'no';
           no.textContent = i + 1;
@@ -944,7 +980,7 @@
         setTimeout(function () { wrap.classList.remove('is-won'); }, 1000);
         winnerEl.innerHTML = '당첨 <b>' + won.name + '</b>';
         winners.push(won.name);
-        renderWinners();
+        renderWinners(true);
         if (removeChk.checked) pool.splice(won.idx, 1);
         // let the result sit a moment, then reshuffle the visible names
         needsResample = true;
