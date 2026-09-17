@@ -176,14 +176,34 @@
   .roulette { display:flex; flex-direction:column; align-items:center; gap:2vh; }
   .wheel-wrap { position:relative; width:min(50vh,38vw,460px); aspect-ratio:1; }
   .wheel-wrap svg { width:100%; height:100%; display:block;
-    filter:drop-shadow(0 14px 40px rgba(3,11,26,.65)); }
+    filter:drop-shadow(0 14px 40px rgba(3,11,26,.7))
+           drop-shadow(0 0 22px rgba(40,120,220,.28)); }
+  /* nebula halo behind the dial, brighter while it spins */
+  .wheel-glow { position:absolute; inset:-9%; border-radius:50%; pointer-events:none;
+    background:radial-gradient(circle, rgba(70,150,255,.34) 0%,
+      rgba(70,150,255,.12) 46%, transparent 70%);
+    filter:blur(20px); opacity:.65;
+    transition:opacity .6s ease, transform .6s ease; }
+  .wheel-wrap.is-spinning .wheel-glow { opacity:1; transform:scale(1.06); }
+  /* light burst from the hub when a name lands */
+  #flash { opacity:0; transform-origin:100px 100px; pointer-events:none; }
+  .wheel-wrap.is-won #flash { animation:flashOut .95s ease-out; }
+  @keyframes flashOut { 0%{opacity:.9; transform:scale(.2);}
+    100%{opacity:0; transform:scale(1);} }
   #wheel { transform-origin:50% 50%;
     transition:transform 4.2s cubic-bezier(.12,.72,.02,1); }
-  .pointer { position:absolute; top:-6px; left:50%; transform:translateX(-50%);
-    width:0; height:0; z-index:2;
-    border-left:13px solid transparent; border-right:13px solid transparent;
-    border-top:23px solid #fff;
-    filter:drop-shadow(0 2px 7px rgba(0,0,0,.7)); }
+  /* slim luminous needle instead of a flat triangle */
+  .pointer { position:absolute; top:-15px; left:50%; transform:translateX(-50%);
+    width:18px; height:32px; z-index:3; pointer-events:none; }
+  .pointer::before { content:''; position:absolute; left:50%; top:6px;
+    transform:translateX(-50%); width:0; height:0;
+    border-left:7px solid transparent; border-right:7px solid transparent;
+    border-top:26px solid #DCEBFF;
+    filter:drop-shadow(0 0 7px rgba(120,190,255,.9))
+           drop-shadow(0 2px 5px rgba(0,0,0,.55)); }
+  .pointer::after { content:''; position:absolute; left:50%; top:0;
+    transform:translateX(-50%); width:8px; height:8px; border-radius:50%;
+    background:#fff; box-shadow:0 0 12px 3px rgba(150,205,255,.95); }
   .spin-btn { padding:14px 40px; border-radius:999px; cursor:pointer;
     font-size:clamp(15px,1.4vw,21px); font-weight:700; color:#fff;
     background:rgba(30,111,208,.3); border:1px solid rgba(30,111,208,.7);
@@ -522,12 +542,52 @@
     <section id="roulette-content" class="slide">
       <div class="roulette-layout">
       <div class="roulette">
-        <div class="wheel-wrap reveal" style="--d:.1s">
+        <div class="wheel-wrap reveal" style="--d:.1s" id="wheelWrap">
+          <div class="wheel-glow"></div>
           <div class="pointer"></div>
           <svg viewBox="0 0 200 200" aria-label="돌림판">
+            <defs>
+              <radialGradient id="segA" cx="50%" cy="50%" r="52%">
+                <stop offset="0%" stop-color="#2C6FC8" />
+                <stop offset="100%" stop-color="#09254F" />
+              </radialGradient>
+              <radialGradient id="segB" cx="50%" cy="50%" r="52%">
+                <stop offset="0%" stop-color="#1B7E8C" />
+                <stop offset="100%" stop-color="#07223F" />
+              </radialGradient>
+              <radialGradient id="segC" cx="50%" cy="50%" r="52%">
+                <stop offset="0%" stop-color="#4A56B8" />
+                <stop offset="100%" stop-color="#0B1C45" />
+              </radialGradient>
+              <radialGradient id="hubG" cx="42%" cy="36%" r="70%">
+                <stop offset="0%" stop-color="#BFDDFF" />
+                <stop offset="45%" stop-color="#2A6FC4" />
+                <stop offset="100%" stop-color="#04142E" />
+              </radialGradient>
+              <radialGradient id="flashG" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#EAF4FF" stop-opacity=".95" />
+                <stop offset="60%" stop-color="#5FA8FF" stop-opacity=".35" />
+                <stop offset="100%" stop-color="#5FA8FF" stop-opacity="0" />
+              </radialGradient>
+            </defs>
+
             <g id="wheel"></g>
-            <circle cx="100" cy="100" r="15" fill="#04142E"
-                    stroke="rgba(255,255,255,.55)" stroke-width="1.5" />
+
+            <!-- fixed bezel: rings and tick marks, like a star-chart dial -->
+            <g id="bezel">
+              <circle cx="100" cy="100" r="99" fill="none"
+                      stroke="rgba(120,190,255,.16)" stroke-width="1.4" />
+              <circle cx="100" cy="100" r="95.6" fill="none"
+                      stroke="rgba(255,255,255,.22)" stroke-width="0.7" />
+              <circle cx="100" cy="100" r="88" fill="none"
+                      stroke="rgba(255,255,255,.10)" stroke-width="0.5" />
+            </g>
+
+            <circle cx="100" cy="100" r="18" fill="url(#hubG)"
+                    stroke="rgba(255,255,255,.45)" stroke-width="1.1" />
+            <circle cx="100" cy="100" r="5.5" fill="#EAF4FF" opacity=".92" />
+
+            <circle id="flash" cx="100" cy="100" r="95" fill="url(#flashG)" />
           </svg>
         </div>
         <button class="spin-btn reveal" style="--d:.25s" id="spinBtn">돌리기</button>
@@ -723,6 +783,7 @@
       var listEl = document.getElementById('winnersList');
       var countEl = document.getElementById('winCount');
       var resetBtn = document.getElementById('resetBtn');
+      var wrap = document.getElementById('wheelWrap');
 
       // A wheel can only carry so many legible labels. With a bigger roster we
       // show a random handful, but the draw stays uniform over everyone:
@@ -787,9 +848,11 @@
             'M100,100 L' + p0[0].toFixed(2) + ',' + p0[1].toFixed(2) +
             ' A95,95 0 ' + (seg > 180 ? 1 : 0) + ',1 ' +
             p1[0].toFixed(2) + ',' + p1[1].toFixed(2) + ' Z');
-          path.setAttribute('fill', i % 2 ? '#1E6FD0' : '#0B3A78');
-          path.setAttribute('stroke', 'rgba(255,255,255,.28)');
-          path.setAttribute('stroke-width', '0.6');
+          var gi = i % 3;
+          if (i === n - 1 && gi === 0) gi = 1;   // keep the seam from matching
+          path.setAttribute('fill', 'url(#seg' + 'ABC'.charAt(gi) + ')');
+          path.setAttribute('stroke', 'rgba(255,255,255,.15)');
+          path.setAttribute('stroke-width', '0.5');
           wheel.appendChild(path);
 
           var mid = a0 + seg / 2, tp = pointAt(mid, 60);
@@ -806,6 +869,23 @@
           var nm = display[i].name;
           t.textContent = nm.length > cut ? nm.slice(0, cut) + '…' : nm;
           wheel.appendChild(t);
+        }
+      }
+
+      // tick marks around the rim, drawn once (outside the rotating group)
+      function buildBezel() {
+        var g = document.getElementById('bezel');
+        if (!g || g.getAttribute('data-built')) return;
+        g.setAttribute('data-built', '1');
+        for (var i = 0; i < 60; i++) {
+          var a = i * 6, major = (i % 5 === 0);
+          var p1 = pointAt(a, major ? 91.5 : 93.2), p2 = pointAt(a, 95.4);
+          var l = document.createElementNS(SVGNS, 'line');
+          l.setAttribute('x1', p1[0].toFixed(2)); l.setAttribute('y1', p1[1].toFixed(2));
+          l.setAttribute('x2', p2[0].toFixed(2)); l.setAttribute('y2', p2[1].toFixed(2));
+          l.setAttribute('stroke', major ? 'rgba(180,220,255,.5)' : 'rgba(255,255,255,.18)');
+          l.setAttribute('stroke-width', major ? '0.9' : '0.5');
+          g.appendChild(l);
         }
       }
 
@@ -852,10 +932,16 @@
         spinBtn.disabled = false;
         var won = display[pendingSeg];
         if (!won) {
+          wrap.classList.remove('is-spinning');
           winnerEl.innerHTML = '버튼을 눌러 추첨하세요';
           needsResample = true;
           return;
         }
+        wrap.classList.remove('is-spinning');
+        wrap.classList.remove('is-won');
+        void wrap.offsetWidth;              // restart the burst animation
+        wrap.classList.add('is-won');
+        setTimeout(function () { wrap.classList.remove('is-won'); }, 1000);
         winnerEl.innerHTML = '당첨 <b>' + won.name + '</b>';
         winners.push(won.name);
         renderWinners();
@@ -874,6 +960,7 @@
         }
         spinning = true;
         spinBtn.disabled = true;
+        wrap.classList.add('is-spinning');
         winnerEl.innerHTML = '추첨 중…';
 
         var n = display.length, seg = 360 / n;
@@ -937,6 +1024,7 @@
       });
 
       namesBox.value = basePool.join('\n');
+      buildBezel();
       prepareRound();
       draw();
       renderWinners();
