@@ -245,6 +245,17 @@
     100%{opacity:0; transform:scale(1);} }
   #wheel { transform-origin:50% 50%;
     transition:transform 4.2s cubic-bezier(.12,.72,.02,1); }
+  /* labels flip like a split-flap departure board when a name is swapped.
+     The radial rotation lives on a wrapping <g>, so this CSS transform is
+     free to drive the flap without clobbering it. */
+  #wheel text { transform-box:fill-box; transform-origin:center; }
+  #wheel text.flip { animation:flapFlip .56s cubic-bezier(.4,0,.6,1); }
+  @keyframes flapFlip {
+    0%   { transform:scaleY(1);   opacity:1; }
+    42%  { transform:scaleY(.06); opacity:.5; }
+    58%  { transform:scaleY(.06); opacity:.5; }
+    100% { transform:scaleY(1);   opacity:1; }
+  }
   .pointer { position:absolute; top:-15px; left:50%; transform:translateX(-50%);
     width:18px; height:32px; z-index:3; pointer-events:none; }
   .pointer::before { content:''; position:absolute; left:50%; top:6px;
@@ -877,7 +888,13 @@
         poolCountEl.textContent = pool.length;
       }
 
+      var labels = [], curCut = 10;
+      function clip(nm) {
+        return nm.length > curCut ? nm.slice(0, curCut) + '…' : nm;
+      }
+
       function draw() {
+        labels = [];
         while (wheel.firstChild) wheel.removeChild(wheel.firstChild);
         var n = display.length;
         if (!n) {
@@ -892,7 +909,8 @@
         }
         var seg = 360 / n;
         var fs = n <= 10 ? 6.2 : n <= 18 ? 5.2 : 4.5;
-        var cut = n <= 10 ? 12 : n <= 18 ? 9 : 7;
+        curCut = n <= 10 ? 12 : n <= 18 ? 9 : 7;
+        labels = [];
         for (var i = 0; i < n; i++) {
           var a0 = i * seg, a1 = (i + 1) * seg;
           var p0 = pointAt(a0, 95), p1 = pointAt(a1, 95);
@@ -908,28 +926,27 @@
           path.setAttribute('stroke-width', '0.5');
           wheel.appendChild(path);
 
-          var mid = a0 + seg / 2, tp = pointAt(mid, 32);
+          // Names sit centred on the middle of their slice, not bunched at
+          // the hub. Laid along the radius (the arc runs out of room as
+          // segments multiply, the radius does not) and flipped on the left
+          // half so every name still reads left-to-right.
+          var mid = a0 + seg / 2, tp = pointAt(mid, 58);
           var tx = tp[0].toFixed(2), ty = tp[1].toFixed(2);
+          var g = document.createElementNS(SVGNS, 'g');
+          g.setAttribute('transform', 'rotate(' +
+            (mid <= 180 ? mid - 90 : mid + 90) + ' ' + tx + ' ' + ty + ')');
           var t = document.createElementNS(SVGNS, 'text');
           t.setAttribute('x', tx);
           t.setAttribute('y', ty);
           t.setAttribute('fill', '#EAF4FF');
           t.setAttribute('font-size', String(fs));
           t.setAttribute('font-weight', '700');
+          t.setAttribute('text-anchor', 'middle');
           t.setAttribute('dominant-baseline', 'middle');
-          // Lay names along the radius, not across the slice: the arc runs out
-          // of room as segments multiply, the radius does not. Flip on the left
-          // half so every name still reads left-to-right.
-          if (mid <= 180) {
-            t.setAttribute('text-anchor', 'start');
-            t.setAttribute('transform', 'rotate(' + (mid - 90) + ' ' + tx + ' ' + ty + ')');
-          } else {
-            t.setAttribute('text-anchor', 'end');
-            t.setAttribute('transform', 'rotate(' + (mid + 90) + ' ' + tx + ' ' + ty + ')');
-          }
-          var nm = display[i].name;
-          t.textContent = nm.length > cut ? nm.slice(0, cut) + '…' : nm;
-          wheel.appendChild(t);
+          t.textContent = clip(display[i].name);
+          g.appendChild(t);
+          wheel.appendChild(g);
+          labels[i] = t;
         }
       }
 
@@ -1048,6 +1065,44 @@
         needsResample = true;
         roundTimer = setTimeout(resample, 1400);
       }
+
+      // While the dial is idle, keep swapping a few labels for other people
+      // on the roster so everyone shows up over time. Never runs mid-spin:
+      // the winner is read from display[], so changing it then would desync
+      // the announced name from the slice under the pointer.
+      function flipLabel(i) {
+        var t = labels[i];
+        if (!t) return;
+        t.classList.remove('flip');
+        void t.getBoundingClientRect();     // restart the animation
+        t.classList.add('flip');
+        setTimeout(function () {
+          if (labels[i] === t && display[i]) t.textContent = clip(display[i].name);
+        }, 235);
+        setTimeout(function () { t.classList.remove('flip'); }, 600);
+      }
+
+      function flipSome() {
+        if (spinning || !display.length) return;
+        if (pool.length <= display.length) return;   // nothing new to show
+        var used = {};
+        display.forEach(function (d) { used[d.idx] = 1; });
+        var swaps = Math.min(3, display.length);
+        for (var k = 0; k < swaps; k++) {
+          var slot = Math.floor(Math.random() * display.length);
+          var ni = -1;
+          for (var tries = 0; tries < 40; tries++) {
+            var c = Math.floor(Math.random() * pool.length);
+            if (!used[c]) { ni = c; break; }
+          }
+          if (ni < 0) continue;
+          delete used[display[slot].idx];
+          used[ni] = 1;
+          display[slot] = { name: pool[ni], idx: ni };
+          flipLabel(slot);
+        }
+      }
+      setInterval(flipSome, 2200);
 
       function spin() {
         if (spinning) return;
