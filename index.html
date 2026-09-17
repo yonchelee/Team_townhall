@@ -185,6 +185,18 @@
     text-transform:uppercase; font-weight:700; color:rgba(180,215,255,.9); }
   .panel-title span { color:#fff; }
 
+  .panel-hint { font-size:11px; color:rgba(190,215,255,.5); letter-spacing:.02em; }
+  .panel-hint b { color:rgba(220,236,255,.85); font-weight:700; }
+  .names-actions { display:flex; gap:8px; }
+  .names-actions .apply-btn { flex:1 1 0; }
+  .file-btn { flex:1 1 0; display:inline-flex; align-items:center;
+    justify-content:center; padding:8px 12px; border-radius:999px;
+    cursor:pointer; font-size:12px; font-weight:600;
+    color:rgba(220,236,255,.9); background:rgba(255,255,255,.07);
+    border:1px solid rgba(255,255,255,.22); }
+  .file-btn:hover { background:rgba(30,111,208,.3);
+    border-color:rgba(30,111,208,.6); }
+  .file-btn input { display:none; }
   .names-panel textarea { flex:1 1 auto; min-height:24vh; resize:vertical;
     padding:10px 11px; border-radius:12px; font-size:13px; line-height:1.55;
     color:#fff; background:rgba(255,255,255,.06);
@@ -219,6 +231,9 @@
                 0 6px 26px rgba(0,0,0,.65);
     opacity:0; pointer-events:none;
     transition:opacity .35s ease, transform .55s cubic-bezier(.2,1.5,.3,1); }
+  .wb-dept { margin-top:.12em; font-size:.26em; font-weight:600;
+    letter-spacing:.06em; color:rgba(196,224,255,.9);
+    text-shadow:0 0 22px rgba(30,136,255,.8), 0 3px 12px rgba(0,0,0,.6); }
   .winner-big::before { content:''; position:absolute; inset:-45% -22%; z-index:-1;
     background:radial-gradient(ellipse at center,
       rgba(2,8,20,.74) 0%, rgba(2,8,20,.45) 45%, transparent 72%); }
@@ -248,8 +263,8 @@
   /* labels flip like a split-flap departure board when a name is swapped.
      The radial rotation lives on a wrapping <g>, so this CSS transform is
      free to drive the flap without clobbering it. */
-  #wheel text { transform-box:fill-box; transform-origin:center; }
-  #wheel text.flip { animation:flapFlip .4s cubic-bezier(.4,0,.6,1); }
+  #wheel g.lbl { transform-box:fill-box; transform-origin:center; }
+  #wheel g.lbl.flip { animation:flapFlip .4s cubic-bezier(.4,0,.6,1); }
   @keyframes flapFlip {
     0%   { transform:scaleY(1);   opacity:1; }
     42%  { transform:scaleY(.06); opacity:.5; }
@@ -290,6 +305,11 @@
     padding:9px 12px; border-radius:11px; background:rgba(30,111,208,.18);
     border:1px solid rgba(30,111,208,.42);
     font-size:clamp(13px,1.1vw,17px); font-weight:600; }
+  .winners-list li .w-name { flex:0 1 auto; min-width:0;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .winners-list li .w-dept { flex:0 0 auto; margin-left:auto; padding-left:8px;
+    font-size:.74em; font-weight:500; color:rgba(180,215,255,.72);
+    white-space:nowrap; }
   .winners-list li .no { flex:0 0 auto; width:22px; height:22px; border-radius:50%;
     display:flex; align-items:center; justify-content:center;
     font-size:11px; font-weight:700; background:rgba(255,255,255,.16); }
@@ -610,9 +630,15 @@
       <div class="draw-layout">
         <aside class="names-panel reveal" style="--d:.15s">
           <div class="panel-title">명단 <span id="poolCount">0</span></div>
+          <div class="panel-hint">한 줄에 <b>이름,부서</b></div>
           <textarea id="namesBox" spellcheck="false"
-            aria-label="명단 (한 줄에 한 명)"></textarea>
-          <button class="apply-btn" id="applyNames">적용</button>
+            aria-label="명단 (한 줄에 이름,부서)"></textarea>
+          <div class="names-actions">
+            <button class="apply-btn" id="applyNames">적용</button>
+            <label class="file-btn">파일 불러오기
+              <input type="file" id="rosterFile" accept=".csv,.tsv,.txt" />
+            </label>
+          </div>
           <label class="opt"><input type="checkbox" id="removeWinner" checked /> 당첨자 제외</label>
         </aside>
 
@@ -663,7 +689,10 @@
 
               <circle id="flash" cx="100" cy="100" r="95" fill="url(#flashG)" />
             </svg>
-            <div class="winner-big" id="winnerBig"></div>
+            <div class="winner-big" id="winnerBig">
+              <div class="wb-name" id="wbName"></div>
+              <div class="wb-dept" id="wbDept"></div>
+            </div>
           </div>
           <button class="spin-btn reveal" style="--d:.25s" id="spinBtn">돌리기</button>
           <div class="winner reveal" style="--d:.3s" id="winner"></div>
@@ -835,35 +864,66 @@
       }
     }, { passive: true });
 
-    // ----- Roulette wheel (scales to very large name pools) -----
+    // ----- Lucky Draw: dial, roster, winners -----
     (function () {
       var wheel = document.getElementById('wheel');
       if (!wheel) return;
-      var spinBtn = document.getElementById('spinBtn');
-      var winnerEl = document.getElementById('winner');
-      var namesBox = document.getElementById('namesBox');
-      var applyBtn = document.getElementById('applyNames');
+      var spinBtn   = document.getElementById('spinBtn');
+      var winnerEl  = document.getElementById('winner');
+      var namesBox  = document.getElementById('namesBox');
+      var applyBtn  = document.getElementById('applyNames');
+      var fileEl    = document.getElementById('rosterFile');
       var removeChk = document.getElementById('removeWinner');
-      var listEl = document.getElementById('winnersList');
-      var countEl = document.getElementById('winCount');
-      var resetBtn = document.getElementById('resetBtn');
-      var wrap = document.getElementById('wheelWrap');
-      var bigEl = document.getElementById('winnerBig');
-      var confettiEl = document.getElementById('confetti');
+      var listEl    = document.getElementById('winnersList');
+      var countEl   = document.getElementById('winCount');
       var poolCountEl = document.getElementById('poolCount');
+      var resetBtn  = document.getElementById('resetBtn');
+      var wrap      = document.getElementById('wheelWrap');
+      var wbName    = document.getElementById('wbName');
+      var wbDept    = document.getElementById('wbDept');
+      var confettiEl = document.getElementById('confetti');
 
-      // A wheel can only carry so many legible labels. With a bigger roster we
+      // A dial can only carry so many legible labels. With a bigger roster we
       // show a random handful, but the draw stays uniform over everyone:
       // sample MAX_SEG entrants at random, then land on one of them at random.
       var MAX_SEG = 28;
+      var DEPT_MAX = 14;          // above this the slices are too thin for a dept line
+      var STORE = 'luckydraw.roster';
       var SVGNS = 'http://www.w3.org/2000/svg';
 
-      var basePool = ['참가자 1','참가자 2','참가자 3','참가자 4',
-                      '참가자 5','참가자 6','참가자 7','참가자 8'];
-      var pool = basePool.slice();   // remaining entrants (duplicate names are fine)
-      var display = [];              // segments on the wheel: {name, idx}
+      // Each entrant is {n: name, d: department}
+      var basePool = [
+        { n: '참가자 1', d: '기구개발팀' }, { n: '참가자 2', d: '기구개발팀' },
+        { n: '참가자 3', d: 'MI파트' },    { n: '참가자 4', d: 'MI파트' },
+        { n: '참가자 5', d: '설계파트' },  { n: '참가자 6', d: '설계파트' },
+        { n: '참가자 7', d: '선행개발' },  { n: '참가자 8', d: '선행개발' }
+      ];
+      var pool = basePool.slice();
+      var display = [];           // slices on the dial: {n, d, idx}
       var winners = [];
       var rotation = 0, spinning = false, pendingSeg = -1;
+      var labels = [], curCut = 10, flipTimers = {};
+      var needsResample = false, roundTimer = null, spinTimer = null;
+
+      // ---------- roster parsing ----------
+      function parseRoster(text) {
+        var out = [];
+        String(text).replace(/^﻿/, '').split(/\r?\n/).forEach(function (ln) {
+          var parts = ln.split(/[,\t;]/);
+          var n = (parts[0] || '').trim();
+          var d = (parts[1] || '').trim();
+          if (n) out.push({ n: n, d: d });
+        });
+        return out;
+      }
+      function rosterToText(list) {
+        return list.map(function (e) {
+          return e.d ? e.n + ',' + e.d : e.n;
+        }).join('\n');
+      }
+      function clip(nm) {
+        return nm.length > curCut ? nm.slice(0, curCut) + '…' : nm;
+      }
 
       // 0deg = 12 o'clock, angles run clockwise
       function pointAt(deg, r) {
@@ -871,26 +931,38 @@
         return [100 + r * Math.cos(a), 100 + r * Math.sin(a)];
       }
 
-      // Pick which entrants the wheel will show this round
+      // ---------- which entrants the dial shows this round ----------
       function prepareRound() {
         display = [];
         if (pool.length <= MAX_SEG) {
-          for (var i = 0; i < pool.length; i++) display.push({ name: pool[i], idx: i });
+          for (var i = 0; i < pool.length; i++)
+            display.push({ n: pool[i].n, d: pool[i].d, idx: i });
         } else {
           var taken = {}, picked = 0;
           while (picked < MAX_SEG) {
             var r = Math.floor(Math.random() * pool.length);
             if (taken[r]) continue;
             taken[r] = 1; picked++;
-            display.push({ name: pool[r], idx: r });
+            display.push({ n: pool[r].n, d: pool[r].d, idx: r });
           }
         }
         poolCountEl.textContent = pool.length;
       }
 
-      var labels = [], curCut = 10, flipTimers = {};
-      function clip(nm) {
-        return nm.length > curCut ? nm.slice(0, curCut) + '…' : nm;
+      function buildBezel() {
+        var g = document.getElementById('bezel');
+        if (!g || g.getAttribute('data-built')) return;
+        g.setAttribute('data-built', '1');
+        for (var i = 0; i < 60; i++) {
+          var a = i * 6, major = (i % 5 === 0);
+          var p1 = pointAt(a, major ? 91.5 : 93.2), p2 = pointAt(a, 95.4);
+          var l = document.createElementNS(SVGNS, 'line');
+          l.setAttribute('x1', p1[0].toFixed(2)); l.setAttribute('y1', p1[1].toFixed(2));
+          l.setAttribute('x2', p2[0].toFixed(2)); l.setAttribute('y2', p2[1].toFixed(2));
+          l.setAttribute('stroke', major ? 'rgba(180,220,255,.5)' : 'rgba(255,255,255,.18)');
+          l.setAttribute('stroke-width', major ? '0.9' : '0.5');
+          g.appendChild(l);
+        }
       }
 
       function draw() {
@@ -910,7 +982,8 @@
         var seg = 360 / n;
         var fs = n <= 10 ? 6.2 : n <= 18 ? 5.2 : 4.5;
         curCut = n <= 10 ? 12 : n <= 18 ? 9 : 7;
-        labels = [];
+        var showDept = n <= DEPT_MAX;
+
         for (var i = 0; i < n; i++) {
           var a0 = i * seg, a1 = (i + 1) * seg;
           var p0 = pointAt(a0, 95), p1 = pointAt(a1, 95);
@@ -926,48 +999,83 @@
           path.setAttribute('stroke-width', '0.5');
           wheel.appendChild(path);
 
-          // Names sit centred on the middle of their slice, not bunched at
-          // the hub. Laid along the radius (the arc runs out of room as
-          // segments multiply, the radius does not) and flipped on the left
-          // half so every name still reads left-to-right.
+          // Names sit centred on the middle of their slice and run along the
+          // radius: the arc runs out of room as slices multiply, the radius
+          // does not. Flipped on the left half so they still read normally.
           var mid = a0 + seg / 2, tp = pointAt(mid, 58);
-          var tx = tp[0].toFixed(2), ty = tp[1].toFixed(2);
-          var g = document.createElementNS(SVGNS, 'g');
-          g.setAttribute('transform', 'rotate(' +
-            (mid <= 180 ? mid - 90 : mid + 90) + ' ' + tx + ' ' + ty + ')');
-          var t = document.createElementNS(SVGNS, 'text');
-          t.setAttribute('x', tx);
-          t.setAttribute('y', ty);
-          t.setAttribute('fill', '#EAF4FF');
-          t.setAttribute('font-size', String(fs));
-          t.setAttribute('font-weight', '700');
-          t.setAttribute('text-anchor', 'middle');
-          t.setAttribute('dominant-baseline', 'middle');
-          t.textContent = clip(display[i].name);
-          g.appendChild(t);
-          wheel.appendChild(g);
-          labels[i] = t;
+          var tx = tp[0].toFixed(2), ty = tp[1];
+          var rot = document.createElementNS(SVGNS, 'g');
+          rot.setAttribute('transform', 'rotate(' +
+            (mid <= 180 ? mid - 90 : mid + 90) + ' ' + tx + ' ' + ty.toFixed(2) + ')');
+          // the flip animates this inner group, so it can carry two lines
+          var lbl = document.createElementNS(SVGNS, 'g');
+          lbl.setAttribute('class', 'lbl');
+
+          var hasD = showDept && display[i].d;
+          var nm = document.createElementNS(SVGNS, 'text');
+          nm.setAttribute('x', tx);
+          nm.setAttribute('y', (hasD ? ty - fs * 0.42 : ty).toFixed(2));
+          nm.setAttribute('fill', '#EAF4FF');
+          nm.setAttribute('font-size', String(fs));
+          nm.setAttribute('font-weight', '700');
+          nm.setAttribute('text-anchor', 'middle');
+          nm.setAttribute('dominant-baseline', 'middle');
+          nm.textContent = clip(display[i].n);
+          lbl.appendChild(nm);
+
+          var dp = null;
+          if (hasD) {
+            dp = document.createElementNS(SVGNS, 'text');
+            dp.setAttribute('x', tx);
+            dp.setAttribute('y', (ty + fs * 0.72).toFixed(2));
+            dp.setAttribute('fill', 'rgba(182,214,255,.78)');
+            dp.setAttribute('font-size', (fs * 0.64).toFixed(2));
+            dp.setAttribute('font-weight', '500');
+            dp.setAttribute('text-anchor', 'middle');
+            dp.setAttribute('dominant-baseline', 'middle');
+            dp.textContent = clip(display[i].d);
+            lbl.appendChild(dp);
+          }
+
+          rot.appendChild(lbl);
+          wheel.appendChild(rot);
+          labels[i] = { g: lbl, nm: nm, dp: dp };
         }
       }
 
-      // tick marks around the rim, drawn once (outside the rotating group)
-      function buildBezel() {
-        var g = document.getElementById('bezel');
-        if (!g || g.getAttribute('data-built')) return;
-        g.setAttribute('data-built', '1');
-        for (var i = 0; i < 60; i++) {
-          var a = i * 6, major = (i % 5 === 0);
-          var p1 = pointAt(a, major ? 91.5 : 93.2), p2 = pointAt(a, 95.4);
-          var l = document.createElementNS(SVGNS, 'line');
-          l.setAttribute('x1', p1[0].toFixed(2)); l.setAttribute('y1', p1[1].toFixed(2));
-          l.setAttribute('x2', p2[0].toFixed(2)); l.setAttribute('y2', p2[1].toFixed(2));
-          l.setAttribute('stroke', major ? 'rgba(180,220,255,.5)' : 'rgba(255,255,255,.18)');
-          l.setAttribute('stroke-width', major ? '0.9' : '0.5');
-          g.appendChild(l);
+      function renderWinners(teleportLast) {
+        countEl.textContent = winners.length;
+        listEl.innerHTML = '';
+        if (!winners.length) {
+          var e = document.createElement('div');
+          e.className = 'winners-empty';
+          e.textContent = '아직 당첨자가 없습니다';
+          listEl.appendChild(e);
+          return;
         }
+        winners.forEach(function (w, i) {
+          var li = document.createElement('li');
+          if (teleportLast && i === winners.length - 1) li.className = 'teleport';
+          var no = document.createElement('span');
+          no.className = 'no';
+          no.textContent = i + 1;
+          li.appendChild(no);
+          var nm = document.createElement('span');
+          nm.className = 'w-name';
+          nm.textContent = w.n;
+          li.appendChild(nm);
+          if (w.d) {
+            var dp = document.createElement('span');
+            dp.className = 'w-dept';
+            dp.textContent = w.d;
+            li.appendChild(dp);
+          }
+          listEl.appendChild(li);
+        });
+        listEl.scrollTop = listEl.scrollHeight;
       }
 
-      // 축포: two cannons in the lower corners, arcing up and across
+      // ---------- 축포 ----------
       var CONF = ['#EAF4FF','#5FA8FF','#1E6FD0','#7FD8E8','#9B8CFF','#FFD98A'];
       function fireConfetti() {
         var frag = document.createDocumentFragment(), made = [];
@@ -994,46 +1102,61 @@
           }
         }
         confettiEl.appendChild(frag);
-        // clear them out so repeated draws don't pile up nodes
         setTimeout(function () {
           made.forEach(function (d) { if (d.parentNode) d.parentNode.removeChild(d); });
         }, 3400);
       }
 
-      function renderWinners(teleportLast) {
-        countEl.textContent = winners.length;
-        listEl.innerHTML = '';
-        if (!winners.length) {
-          var e = document.createElement('div');
-          e.className = 'winners-empty';
-          e.textContent = '아직 당첨자가 없습니다';
-          listEl.appendChild(e);
-          return;
+      // ---------- idle flap board ----------
+      function flipLabel(i) {
+        var L = labels[i];
+        if (!L) return;
+        if (flipTimers[i]) {
+          clearTimeout(flipTimers[i][0]); clearTimeout(flipTimers[i][1]);
         }
-        winners.forEach(function (w, i) {
-          var li = document.createElement('li');
-          if (teleportLast && i === winners.length - 1) li.className = 'teleport';
-          var no = document.createElement('span');
-          no.className = 'no';
-          no.textContent = i + 1;
-          li.appendChild(no);
-          li.appendChild(document.createTextNode(w));
-          listEl.appendChild(li);
-        });
-        listEl.scrollTop = listEl.scrollHeight;
+        L.g.classList.remove('flip');
+        void L.g.getBoundingClientRect();
+        L.g.classList.add('flip');
+        flipTimers[i] = [
+          setTimeout(function () {
+            if (labels[i] !== L || !display[i]) return;
+            L.nm.textContent = clip(display[i].n);
+            if (L.dp) L.dp.textContent = clip(display[i].d || '');
+          }, 165),
+          setTimeout(function () {
+            L.g.classList.remove('flip');
+            delete flipTimers[i];
+          }, 430)
+        ];
       }
 
-      // The wheel keeps its angle between rounds. It used to snap back to 0
-      // on a timer 1.6s after each win, and that snap set transition:none —
-      // if the next spin had already started, the running transition was
-      // cancelled, transitionend never fired, and the button stayed locked
-      // on "추첨 중…" forever.
-      var needsResample = false, roundTimer = null, spinTimer = null;
+      // Never runs mid-spin: the winner is read from display[], so mutating it
+      // then would desync the announced name from the slice under the pointer.
+      function flipSome() {
+        if (spinning || !display.length) return;
+        if (pool.length <= display.length) return;
+        var used = {};
+        display.forEach(function (d) { used[d.idx] = 1; });
+        for (var k = 0; k < 3; k++) {
+          var slot = Math.floor(Math.random() * display.length);
+          var ni = -1;
+          for (var t = 0; t < 40; t++) {
+            var c = Math.floor(Math.random() * pool.length);
+            if (!used[c]) { ni = c; break; }
+          }
+          if (ni < 0) continue;
+          delete used[display[slot].idx];
+          used[ni] = 1;
+          display[slot] = { n: pool[ni].n, d: pool[ni].d, idx: ni };
+          flipLabel(slot);
+        }
+      }
+      setInterval(flipSome, 500);
 
+      // ---------- spin lifecycle ----------
       function resample() {
         clearTimeout(roundTimer); roundTimer = null;
-        prepareRound();
-        draw();
+        prepareRound(); draw();
         needsResample = false;
       }
 
@@ -1051,93 +1174,45 @@
         }
         wrap.classList.remove('is-spinning');
         wrap.classList.remove('is-won');
-        void wrap.offsetWidth;              // restart the burst animation
+        void wrap.offsetWidth;              // restart the burst
         wrap.classList.add('is-won');
         setTimeout(function () { wrap.classList.remove('is-won'); }, 1000);
-        bigEl.textContent = won.name;
+        wbName.textContent = won.n;
+        wbDept.textContent = won.d || '';
         wrap.classList.add('show-name');
         fireConfetti();
         winnerEl.innerHTML = '축하합니다';
-        winners.push(won.name);
+        winners.push({ n: won.n, d: won.d });
         renderWinners(true);
         if (removeChk.checked) pool.splice(won.idx, 1);
-        // let the result sit a moment, then reshuffle the visible names
         needsResample = true;
         roundTimer = setTimeout(resample, 1400);
       }
 
-      // While the dial is idle, keep swapping a few labels for other people
-      // on the roster so everyone shows up over time. Never runs mid-spin:
-      // the winner is read from display[], so changing it then would desync
-      // the announced name from the slice under the pointer.
-      function flipLabel(i) {
-        var t = labels[i];
-        if (!t) return;
-        if (flipTimers[i]) {                // cancel the previous flip's timers
-          clearTimeout(flipTimers[i][0]);
-          clearTimeout(flipTimers[i][1]);
-        }
-        t.classList.remove('flip');
-        void t.getBoundingClientRect();     // restart the animation
-        t.classList.add('flip');
-        flipTimers[i] = [
-          setTimeout(function () {
-            if (labels[i] === t && display[i]) t.textContent = clip(display[i].name);
-          }, 165),
-          setTimeout(function () {
-            t.classList.remove('flip');
-            delete flipTimers[i];
-          }, 430)
-        ];
-      }
-
-      function flipSome() {
-        if (spinning || !display.length) return;
-        if (pool.length <= display.length) return;   // nothing new to show
-        var used = {};
-        display.forEach(function (d) { used[d.idx] = 1; });
-        var swaps = Math.min(3, display.length);
-        for (var k = 0; k < swaps; k++) {
-          var slot = Math.floor(Math.random() * display.length);
-          var ni = -1;
-          for (var tries = 0; tries < 40; tries++) {
-            var c = Math.floor(Math.random() * pool.length);
-            if (!used[c]) { ni = c; break; }
-          }
-          if (ni < 0) continue;
-          delete used[display[slot].idx];
-          used[ni] = 1;
-          display[slot] = { name: pool[ni], idx: ni };
-          flipLabel(slot);
-        }
-      }
-      setInterval(flipSome, 500);
-
       function spin() {
         if (spinning) return;
-        if (needsResample) resample();     // never leave a stale round behind
+        if (needsResample) resample();
         if (!pool.length || !display.length) {
           winnerEl.innerHTML = '명단이 비었습니다 · 초기화를 눌러 주세요';
           return;
         }
         spinning = true;
         spinBtn.disabled = true;
-        wrap.classList.remove('show-name');   // clear the last name before spinning
+        wrap.classList.remove('show-name');
         wrap.classList.add('is-spinning');
         winnerEl.innerHTML = '추첨 중…';
 
         var n = display.length, seg = 360 / n;
         pendingSeg = Math.floor(Math.random() * n);
-        // aim somewhere inside that segment, away from its edges
         var target = pendingSeg * seg + seg * (0.2 + Math.random() * 0.6);
         var turns = 5 + Math.floor(Math.random() * 4);
         var want = ((360 - target) % 360 + 360) % 360;
         var cur = ((rotation % 360) + 360) % 360;
         var delta = ((want - cur) % 360 + 360) % 360;
         rotation += turns * 360 + delta;
-        wheel.style.transition = '';       // ensure the easing is live
+        wheel.style.transition = '';
         wheel.style.transform = 'rotate(' + rotation + 'deg)';
-        // failsafe so a missed transitionend can never lock the wheel
+        // failsafe so a missed transitionend can never lock the dial
         spinTimer = setTimeout(finishSpin, 5200);
       }
 
@@ -1146,7 +1221,7 @@
         finishSpin();
       });
 
-      // Full reset, also the recovery path if anything ever gets stuck
+      // ---------- reset / roster loading ----------
       function restore(list) {
         clearTimeout(roundTimer); clearTimeout(spinTimer);
         roundTimer = spinTimer = null;
@@ -1160,8 +1235,7 @@
         rotation = 0;
         wheel.style.transition = 'none';
         wheel.style.transform = 'rotate(0deg)';
-        prepareRound();
-        draw();
+        prepareRound(); draw();
         needsResample = false;
         renderWinners();
         requestAnimationFrame(function () {
@@ -1169,26 +1243,61 @@
         });
       }
 
+      function applyRoster() {
+        var list = parseRoster(namesBox.value);
+        if (list.length < 2) { winnerEl.innerHTML = '두 명 이상 입력해 주세요'; return; }
+        restore(list);
+        // remembered on this machine only - nothing is uploaded anywhere
+        try { localStorage.setItem(STORE, rosterToText(list)); } catch (err) {}
+        var withDept = list.filter(function (e) { return e.d; }).length;
+        winnerEl.innerHTML = list.length + '명 등록 완료' +
+          (withDept ? ' · 부서 ' + withDept + '명' : '');
+      }
+
       resetBtn.addEventListener('click', function () {
         restore(null);
         winnerEl.innerHTML = '';
       });
-
       spinBtn.addEventListener('click', spin);
       spinBtn.addEventListener('keydown', function (e) {
         if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); spin(); }
       });
+      applyBtn.addEventListener('click', applyRoster);
 
-      applyBtn.addEventListener('click', function () {
-        var list = namesBox.value.split('\n')
-          .map(function (v) { return v.trim(); })
-          .filter(function (v) { return v; });
-        if (list.length < 2) { winnerEl.innerHTML = '두 명 이상 입력해 주세요'; return; }
-        restore(list);
-        winnerEl.innerHTML = list.length + '명 등록 완료';
-      });
+      // Read a CSV straight off the presenting machine. Korean files exported
+      // from Excel are often CP949, so fall back when UTF-8 decoding fails.
+      if (fileEl) {
+        fileEl.addEventListener('change', function () {
+          var f = fileEl.files && fileEl.files[0];
+          if (!f) return;
+          var r = new FileReader();
+          r.onload = function () {
+            var txt = '';
+            try {
+              txt = new TextDecoder('utf-8').decode(r.result);
+              if (txt.indexOf('�') !== -1) {
+                txt = new TextDecoder('euc-kr').decode(r.result);
+              }
+            } catch (err) {
+              try { txt = new TextDecoder('euc-kr').decode(r.result); } catch (e2) {}
+            }
+            namesBox.value = txt;
+            applyRoster();
+            fileEl.value = '';
+          };
+          r.readAsArrayBuffer(f);
+        });
+      }
 
-      namesBox.value = basePool.join('\n');
+      // ---------- init ----------
+      try {
+        var saved = localStorage.getItem(STORE);
+        if (saved) {
+          var restored = parseRoster(saved);
+          if (restored.length >= 2) { basePool = restored; pool = basePool.slice(); }
+        }
+      } catch (err) {}
+      namesBox.value = rosterToText(basePool);
       buildBezel();
       prepareRound();
       draw();
