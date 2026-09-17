@@ -187,6 +187,12 @@
 
   .panel-hint { font-size:11px; color:rgba(190,215,255,.5); letter-spacing:.02em; }
   .panel-hint b { color:rgba(220,236,255,.85); font-weight:700; }
+  .col-map { display:flex; gap:8px; }
+  .col-map label { flex:1 1 0; display:flex; align-items:center; gap:5px;
+    font-size:11px; color:rgba(190,215,255,.7); }
+  .col-map select { flex:1 1 0; min-width:0; padding:4px 6px; border-radius:8px;
+    font-size:11px; color:#fff; background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.2); }
   .names-actions { display:flex; gap:8px; }
   .names-actions .apply-btn { flex:1 1 0; }
   .file-btn { flex:1 1 0; display:inline-flex; align-items:center;
@@ -630,9 +636,13 @@
       <div class="draw-layout">
         <aside class="names-panel reveal" style="--d:.15s">
           <div class="panel-title">명단 <span id="poolCount">0</span></div>
-          <div class="panel-hint">한 줄에 <b>이름,부서</b></div>
+          <div class="panel-hint">엑셀 CSV · 열 자동 인식</div>
           <textarea id="namesBox" spellcheck="false"
             aria-label="명단 (한 줄에 이름,부서)"></textarea>
+          <div class="col-map">
+            <label>이름 <select id="nameCol" aria-label="이름 열"></select></label>
+            <label>부서 <select id="deptCol" aria-label="부서 열"></select></label>
+          </div>
           <div class="names-actions">
             <button class="apply-btn" id="applyNames">적용</button>
             <label class="file-btn">파일 불러오기
@@ -873,6 +883,8 @@
       var namesBox  = document.getElementById('namesBox');
       var applyBtn  = document.getElementById('applyNames');
       var fileEl    = document.getElementById('rosterFile');
+      var nameColEl = document.getElementById('nameCol');
+      var deptColEl = document.getElementById('deptCol');
       var removeChk = document.getElementById('removeWinner');
       var listEl    = document.getElementById('winnersList');
       var countEl   = document.getElementById('winCount');
@@ -906,21 +918,117 @@
       var needsResample = false, roundTimer = null, spinTimer = null;
 
       // ---------- roster parsing ----------
-      function parseRoster(text) {
+      // A pasted sheet can carry any number of columns in any order, so the
+      // name and department columns are detected rather than assumed.
+      var rawRows = [], nameCol = 0, deptCol = 1, hasHeader = false;
+      // Header labels must match a whole cell. Substring matching mistook a
+      // data row for a header, because real values like "기구개발팀" contain 팀 —
+      // which silently dropped the first person from the roster.
+      var NAME_HDR = /^(이름|성명|성함|사원명|직원명|name)$/i;
+      var DEPT_HDR = /^(부서|부서명|팀|팀명|소속|소속부서|조직|관할조직|파트|department|dept|division|org|organization)$/i;
+
+      function parseRows(text) {
+        var t = String(text);
+        if (t.charCodeAt(0) === 65279) t = t.slice(1);   // strip a BOM
+        var rows = [];
+        t.split(/\r?\n/).forEach(function (ln) {
+          if (!ln.trim()) return;
+          rows.push(ln.split(/[,\t;]/).map(function (c) {
+            return c.trim().replace(/^"|"$/g, '');
+          }));
+        });
+        return rows;
+      }
+
+      function detectCols(rows) {
+        var cols = 1;
+        rows.forEach(function (r) { if (r.length > cols) cols = r.length; });
+        var dflt = cols < 2 ? -1 : 1;        // -1 means no department column
+        if (!rows.length) return { name: 0, dept: dflt, header: false };
+
+        // 1) an explicit header row
+        var hn = -1, hd = -1;
+        rows[0].forEach(function (c, i) {
+          if (hn < 0 && NAME_HDR.test(c)) hn = i;
+          if (hd < 0 && DEPT_HDR.test(c)) hd = i;
+        });
+        if (hn >= 0 || hd >= 0) {
+          if (hn < 0) hn = (hd === 0) ? Math.min(1, cols - 1) : 0;
+          if (hd < 0) hd = (hn === 0) ? dflt : 0;
+          return { name: hn, dept: hd, header: true };
+        }
+
+        // 2) no header. This sheet is 이름, 부서명, 관할조직, so trust that
+        //    order unless the first column looks like an id number.
+        var idish = 0, seen0 = 0;
+        rows.forEach(function (r) {
+          var v = (r[0] || '').trim();
+          if (!v) return;
+          seen0++;
+          if (/^[0-9][0-9\-\s]*$/.test(v)) idish++;
+        });
+        if (!seen0 || idish / seen0 < 0.5) {
+          return { name: 0, dept: dflt, header: false };
+        }
+
+        // 3) ids sit in the first column, so score the remaining ones:
+        //    people's names are 2-4 hangul, departments end in 팀/파트/실/...
+        var nScore = [], dScore = [];
+        for (var c = 0; c < cols; c++) {
+          var person = 0, deptish = 0, numeric = 0, seen = 0;
+          rows.forEach(function (r) {
+            var v = (r[c] || '').trim();
+            if (!v) return;
+            seen++;
+            if (/^[가-힣]{2,4}$/.test(v)) person++;
+            if (/(팀|파트|그룹|실|센터|본부|담당|과|사업부|개발|연구소)$/.test(v)) deptish++;
+            if (/^[0-9][0-9\-\s]*$/.test(v)) numeric++;
+          });
+          nScore[c] = seen ? (person - deptish - numeric * 2) / seen : -9;
+          dScore[c] = seen ? (deptish - numeric * 2) / seen : -9;
+        }
+        var nIdx = 0;
+        for (var i2 = 1; i2 < cols; i2++) if (nScore[i2] > nScore[nIdx]) nIdx = i2;
+        var dIdx = -1;
+        for (var i3 = 0; i3 < cols; i3++) {
+          if (i3 === nIdx) continue;
+          if (dIdx < 0 || dScore[i3] > dScore[dIdx]) dIdx = i3;
+        }
+        return { name: nIdx, dept: dIdx, header: false };
+      }
+
+      function fillColSelects(cols) {
+        [[nameColEl, nameCol, false], [deptColEl, deptCol, true]].forEach(function (t) {
+          var el = t[0];
+          if (!el) return;
+          el.innerHTML = '';
+          if (t[2]) {                      // department may be left out
+            var none = document.createElement('option');
+            none.value = '-1';
+            none.textContent = '없음';
+            el.appendChild(none);
+          }
+          for (var c = 0; c < cols; c++) {
+            var o = document.createElement('option');
+            o.value = String(c);
+            o.textContent = (c + 1) + '열';
+            el.appendChild(o);
+          }
+          el.value = String(t[1]);
+        });
+      }
+
+      function rowsToPool() {
         var out = [];
-        String(text).replace(/^﻿/, '').split(/\r?\n/).forEach(function (ln) {
-          var parts = ln.split(/[,\t;]/);
-          var n = (parts[0] || '').trim();
-          var d = (parts[1] || '').trim();
+        rawRows.forEach(function (r, i) {
+          if (hasHeader && i === 0) return;
+          var n = (r[nameCol] || '').trim();
+          var d = deptCol >= 0 ? (r[deptCol] || '').trim() : '';
           if (n) out.push({ n: n, d: d });
         });
         return out;
       }
-      function rosterToText(list) {
-        return list.map(function (e) {
-          return e.d ? e.n + ',' + e.d : e.n;
-        }).join('\n');
-      }
+
       function clip(nm) {
         return nm.length > curCut ? nm.slice(0, curCut) + '…' : nm;
       }
@@ -1243,15 +1351,36 @@
         });
       }
 
-      function applyRoster() {
-        var list = parseRoster(namesBox.value);
+      function loadRoster(text, redetect) {
+        rawRows = parseRows(text);
+        var cols = 1;
+        rawRows.forEach(function (r) { if (r.length > cols) cols = r.length; });
+        if (redetect) {
+          var det = detectCols(rawRows);
+          nameCol = det.name; deptCol = det.dept; hasHeader = det.header;
+        }
+        if (nameCol >= cols || nameCol < 0) nameCol = 0;
+        if (deptCol >= cols) deptCol = cols < 2 ? -1 : 1;
+        fillColSelects(cols);
+        return rowsToPool();
+      }
+
+      function applyRoster(redetect) {
+        var list = loadRoster(namesBox.value, redetect !== false);
         if (list.length < 2) { winnerEl.innerHTML = '두 명 이상 입력해 주세요'; return; }
         restore(list);
         // remembered on this machine only - nothing is uploaded anywhere
-        try { localStorage.setItem(STORE, rosterToText(list)); } catch (err) {}
+        try {
+          localStorage.setItem(STORE, JSON.stringify({
+            t: namesBox.value, n: nameCol, d: deptCol, h: hasHeader
+          }));
+        } catch (err) {}
+        var cols = 1;
+        rawRows.forEach(function (r) { if (r.length > cols) cols = r.length; });
         var withDept = list.filter(function (e) { return e.d; }).length;
-        winnerEl.innerHTML = list.length + '명 등록 완료' +
-          (withDept ? ' · 부서 ' + withDept + '명' : '');
+        winnerEl.innerHTML = list.length + '명 등록 · 이름 ' + (nameCol + 1) + '열' +
+          (deptCol >= 0 ? ' · 부서 ' + (deptCol + 1) + '열' : '') +
+          (withDept ? ' (' + withDept + '명)' : '');
       }
 
       resetBtn.addEventListener('click', function () {
@@ -1262,7 +1391,18 @@
       spinBtn.addEventListener('keydown', function (e) {
         if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); spin(); }
       });
-      applyBtn.addEventListener('click', applyRoster);
+      applyBtn.addEventListener('click', function () { applyRoster(true); });
+      // changing a column re-reads the same sheet without re-detecting
+      [nameColEl, deptColEl].forEach(function (el) {
+        if (!el) return;
+        el.addEventListener('change', function () {
+          nameCol = parseInt(nameColEl.value, 10);
+          deptCol = parseInt(deptColEl.value, 10);
+          if (isNaN(nameCol)) nameCol = 0;
+          if (isNaN(deptCol)) deptCol = -1;
+          applyRoster(false);
+        });
+      });
 
       // Read a CSV straight off the presenting machine. Korean files exported
       // from Excel are often CP949, so fall back when UTF-8 decoding fails.
@@ -1282,7 +1422,7 @@
               try { txt = new TextDecoder('euc-kr').decode(r.result); } catch (e2) {}
             }
             namesBox.value = txt;
-            applyRoster();
+            applyRoster(true);
             fileEl.value = '';
           };
           r.readAsArrayBuffer(f);
@@ -1290,14 +1430,20 @@
       }
 
       // ---------- init ----------
+      var seedText = basePool.map(function (e) { return e.n + ',' + e.d; }).join('\n');
       try {
         var saved = localStorage.getItem(STORE);
         if (saved) {
-          var restored = parseRoster(saved);
-          if (restored.length >= 2) { basePool = restored; pool = basePool.slice(); }
+          var o = JSON.parse(saved);
+          if (o && typeof o.t === 'string') {
+            seedText = o.t;
+            nameCol = o.n | 0; deptCol = o.d | 0; hasHeader = !!o.h;
+          }
         }
       } catch (err) {}
-      namesBox.value = rosterToText(basePool);
+      namesBox.value = seedText;
+      var seeded = loadRoster(seedText, false);
+      if (seeded.length >= 2) { basePool = seeded; pool = basePool.slice(); }
       buildBezel();
       prepareRound();
       draw();
