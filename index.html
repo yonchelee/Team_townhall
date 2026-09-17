@@ -180,16 +180,62 @@
   .draw-side { flex:1 1 0; min-width:0; display:flex; align-items:center; }
   .draw-side--left { justify-content:flex-start; }
   .draw-side--right { justify-content:flex-end; }
-  .names-panel, .winners-panel { flex:0 0 auto;
-    width:clamp(200px,18vw,300px); max-height:78vh;
+  .roster-card, .winners-panel { flex:1 1 auto; width:100%; max-width:640px;
+    max-height:78vh;
     display:flex; flex-direction:column; gap:10px; padding:18px 16px;
     border-radius:18px; background:rgba(255,255,255,.05);
     border:1px solid rgba(255,255,255,.14);
     -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
     box-shadow:0 10px 36px rgba(3,11,26,.45); }
   /* the winner list is the one people read from the back of the room */
-  .winners-panel { flex:1 1 auto; width:100%; max-width:640px;
-    padding:22px 20px; gap:13px; }
+  .winners-panel { padding:22px 20px; gap:13px; }
+  /* Left column is now audience-facing status, not an operator form */
+  .roster-card { padding:22px 20px; gap:14px; }
+  .rc-count { display:flex; align-items:baseline; gap:10px; }
+  .rc-num { font-size:clamp(46px,5vw,104px); font-weight:800; line-height:1;
+    color:#fff; font-variant-numeric:tabular-nums;
+    text-shadow:0 0 30px rgba(30,136,255,.6), 0 0 70px rgba(30,136,255,.28); }
+  .rc-total { font-size:clamp(13px,1.25vw,19px); color:rgba(190,215,255,.72); }
+  .rc-total b { color:#fff; font-weight:700; }
+  .rc-bar { height:6px; border-radius:99px; background:rgba(255,255,255,.1);
+    overflow:hidden; }
+  .rc-bar i { display:block; height:100%; border-radius:99px; width:0;
+    background:linear-gradient(90deg,var(--deep-blue),var(--bright-blue));
+    box-shadow:0 0 12px 1px var(--accent-glow); transition:width .6s ease; }
+  .rc-meta { font-size:clamp(11px,1.05vw,15px); color:rgba(190,215,255,.7); }
+  .rc-btn { margin-top:auto; padding:11px 18px; border-radius:999px;
+    cursor:pointer; font-size:clamp(12px,1.15vw,16px); font-weight:600;
+    color:rgba(220,236,255,.92); background:rgba(255,255,255,.07);
+    border:1px solid rgba(255,255,255,.22);
+    transition:background .25s ease, border-color .25s ease; }
+  .rc-btn:hover { background:rgba(30,111,208,.3);
+    border-color:rgba(30,111,208,.6); color:#fff; }
+
+  /* the form itself moves into a drawer the presenter opens when needed */
+  .roster-drawer { position:fixed; inset:0; z-index:200; visibility:hidden; }
+  .roster-drawer.open { visibility:visible; }
+  .roster-drawer .scrim { position:absolute; inset:0; opacity:0;
+    background:rgba(1,6,15,.72); -webkit-backdrop-filter:blur(4px);
+    backdrop-filter:blur(4px); transition:opacity .35s ease; }
+  .roster-drawer.open .scrim { opacity:1; }
+  .roster-drawer .sheet { position:absolute; left:0; top:0; bottom:0;
+    width:min(440px,92vw); padding:26px 24px; overflow-y:auto;
+    background:rgba(5,18,40,.97);
+    border-right:1px solid rgba(255,255,255,.16);
+    box-shadow:24px 0 60px rgba(0,0,0,.5);
+    display:flex; flex-direction:column; gap:12px;
+    transform:translateX(-100%);
+    transition:transform .4s cubic-bezier(.22,1,.36,1); }
+  .roster-drawer.open .sheet { transform:none; }
+  .sheet-head { display:flex; align-items:center; justify-content:space-between; }
+  .sheet-x { width:32px; height:32px; border-radius:50%; cursor:pointer;
+    font-size:20px; line-height:1; color:#fff;
+    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.2); }
+  .sheet-x:hover { background:rgba(214,64,64,.3); border-color:rgba(214,64,64,.6); }
+  .roster-drawer textarea { flex:1 1 auto; min-height:240px; resize:vertical;
+    padding:10px 11px; border-radius:12px; font-size:13px; line-height:1.55;
+    color:#fff; background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.18); }
   .winners-panel .panel-title { font-size:clamp(14px,1.45vw,22px);
     letter-spacing:.18em; }
   .panel-title { font-size:clamp(10px,.95vw,13px); letter-spacing:.2em;
@@ -214,10 +260,6 @@
   .file-btn:hover { background:rgba(30,111,208,.3);
     border-color:rgba(30,111,208,.6); }
   .file-btn input { display:none; }
-  .names-panel textarea { flex:1 1 auto; min-height:24vh; resize:vertical;
-    padding:10px 11px; border-radius:12px; font-size:13px; line-height:1.55;
-    color:#fff; background:rgba(255,255,255,.06);
-    border:1px solid rgba(255,255,255,.18); }
   .apply-btn { padding:8px 18px; border-radius:999px; cursor:pointer;
     font-size:12px; font-weight:700; color:#fff;
     background:rgba(30,111,208,.3); border:1px solid rgba(30,111,208,.65); }
@@ -370,11 +412,11 @@
   @media (max-width:1100px) {
     .draw-layout { flex-wrap:wrap; }
     .draw-side { flex:1 1 100%; justify-content:center; }
-    .names-panel, .winners-panel { width:min(46vw,300px); max-width:none;
+    .roster-card, .winners-panel { width:min(46vw,340px); max-width:none;
       max-height:34vh; }
     .roulette { flex:1 1 100%; order:-1; width:auto; }
     .wheel-wrap { width:min(46vh,86vw); }
-    .names-panel textarea, .winners-list { min-height:14vh; }
+    .winners-list { min-height:14vh; }
   }
 
   /* ===== Content panel (내용 페이지) ===== */
@@ -547,6 +589,31 @@
   <div class="vignette"></div>
   <div class="confetti" id="confetti"></div>
 
+  <!-- roster setup: opened from the Lucky Draw slide when needed -->
+  <div class="roster-drawer" id="rosterDrawer">
+    <div class="scrim" data-close></div>
+    <div class="sheet">
+      <div class="sheet-head">
+        <div class="panel-title">명단 설정</div>
+        <button class="sheet-x" data-close aria-label="닫기">&times;</button>
+      </div>
+      <div class="panel-hint">엑셀 CSV · 열 자동 인식</div>
+      <textarea id="namesBox" spellcheck="false"
+        aria-label="명단 (한 줄에 이름,부서)"></textarea>
+      <div class="col-map">
+        <label>이름 <select id="nameCol" aria-label="이름 열"></select></label>
+        <label>부서 <select id="deptCol" aria-label="부서 열"></select></label>
+      </div>
+      <div class="names-actions">
+        <button class="apply-btn" id="applyNames">적용</button>
+        <label class="file-btn">파일 불러오기
+          <input type="file" id="rosterFile" accept=".csv,.tsv,.txt" />
+        </label>
+      </div>
+      <label class="opt"><input type="checkbox" id="removeWinner" checked /> 당첨자 제외</label>
+    </div>
+  </div>
+
   <!-- ===== Slides ===== -->
   <main class="deck" id="deck">
     <div class="track" id="track">
@@ -644,23 +711,16 @@
     <section id="roulette-content" class="slide slide--draw">
       <div class="draw-layout">
         <div class="draw-side draw-side--left">
-        <aside class="names-panel reveal" style="--d:.15s">
-          <div class="panel-title">명단 <span id="poolCount">0</span></div>
-          <div class="panel-hint">엑셀 CSV · 열 자동 인식</div>
-          <textarea id="namesBox" spellcheck="false"
-            aria-label="명단 (한 줄에 이름,부서)"></textarea>
-          <div class="col-map">
-            <label>이름 <select id="nameCol" aria-label="이름 열"></select></label>
-            <label>부서 <select id="deptCol" aria-label="부서 열"></select></label>
-          </div>
-          <div class="names-actions">
-            <button class="apply-btn" id="applyNames">적용</button>
-            <label class="file-btn">파일 불러오기
-              <input type="file" id="rosterFile" accept=".csv,.tsv,.txt" />
-            </label>
-          </div>
-          <label class="opt"><input type="checkbox" id="removeWinner" checked /> 당첨자 제외</label>
-        </aside>
+          <aside class="roster-card reveal" style="--d:.15s">
+            <div class="panel-title">명단 <span id="rcDept"></span></div>
+            <div class="rc-count">
+              <span class="rc-num" id="rcRemain">0</span>
+              <span class="rc-total">남음 / 전체 <b id="rcTotal">0</b>명</span>
+            </div>
+            <div class="rc-bar"><i id="rcBar"></i></div>
+            <div class="rc-meta" id="rcMeta">추첨 0명 완료</div>
+            <button class="rc-btn" id="openRoster">명단 설정</button>
+          </aside>
         </div>
 
         <div class="roulette">
@@ -884,6 +944,8 @@
       // never steal keys while someone is typing in the name list
       var tg = e.target;
       if (tg && /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName)) return;
+      var dr = document.getElementById('rosterDrawer');
+      if (dr && dr.classList.contains('open')) return;
       if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].indexOf(e.key) !== -1) {
         e.preventDefault(); next();
       } else if (['ArrowLeft', 'ArrowUp', 'PageUp'].indexOf(e.key) !== -1) {
@@ -932,7 +994,13 @@
       var removeChk = document.getElementById('removeWinner');
       var listEl    = document.getElementById('winnersList');
       var countEl   = document.getElementById('winCount');
-      var poolCountEl = document.getElementById('poolCount');
+      var rcRemain  = document.getElementById('rcRemain');
+      var rcTotal   = document.getElementById('rcTotal');
+      var rcBar     = document.getElementById('rcBar');
+      var rcMeta    = document.getElementById('rcMeta');
+      var rcDept    = document.getElementById('rcDept');
+      var drawer    = document.getElementById('rosterDrawer');
+      var openBtn   = document.getElementById('openRoster');
       var resetBtn  = document.getElementById('resetBtn');
       var wrap      = document.getElementById('wheelWrap');
       var wbName    = document.getElementById('wbName');
@@ -1098,8 +1166,26 @@
             display.push({ n: pool[r].n, d: pool[r].d, idx: r });
           }
         }
-        poolCountEl.textContent = pool.length;
+        updateCard();
       }
+
+      // Audience-facing summary: how many are still in, how far along we are
+      function updateCard() {
+        var total = basePool.length, left = pool.length, drawn = total - left;
+        if (rcRemain) rcRemain.textContent = left;
+        if (rcTotal) rcTotal.textContent = total;
+        if (rcBar) rcBar.style.width = total ? (drawn / total * 100).toFixed(1) + '%' : '0%';
+        if (rcMeta) rcMeta.textContent = '추첨 ' + drawn + '명 완료';
+        if (rcDept) {
+          var seen = {}, n = 0;
+          basePool.forEach(function (e) {
+            if (e.d && !seen[e.d]) { seen[e.d] = 1; n++; }
+          });
+          rcDept.textContent = n ? '· 부서 ' + n + '곳' : '';
+        }
+      }
+
+      function setDrawer(on) { if (drawer) drawer.classList.toggle('open', on); }
 
       function buildBezel() {
         var g = document.getElementById('bezel');
@@ -1343,6 +1429,7 @@
         winners.push({ n: won.n, d: won.d });
         renderWinners(true);
         if (removeChk.checked) pool.splice(won.idx, 1);
+        updateCard();
         needsResample = true;
         roundTimer = setTimeout(resample, 1400);
       }
@@ -1395,6 +1482,7 @@
         wheel.style.transform = 'rotate(0deg)';
         prepareRound(); draw();
         needsResample = false;
+        updateCard();
         renderWinners();
         requestAnimationFrame(function () {
           requestAnimationFrame(function () { wheel.style.transition = ''; });
@@ -1427,6 +1515,7 @@
         } catch (err) {}
         var cols = 1;
         rawRows.forEach(function (r) { if (r.length > cols) cols = r.length; });
+        setDrawer(false);
         var withDept = list.filter(function (e) { return e.d; }).length;
         winnerEl.innerHTML = list.length + '명 등록 · 이름 ' + (nameCol + 1) + '열' +
           (deptCol >= 0 ? ' · 부서 ' + (deptCol + 1) + '열' : '') +
@@ -1440,6 +1529,17 @@
       spinBtn.addEventListener('click', spin);
       spinBtn.addEventListener('keydown', function (e) {
         if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); spin(); }
+      });
+      if (openBtn) openBtn.addEventListener('click', function () { setDrawer(true); });
+      if (drawer) {
+        drawer.querySelectorAll('[data-close]').forEach(function (el) {
+          el.addEventListener('click', function () { setDrawer(false); });
+        });
+      }
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && drawer && drawer.classList.contains('open')) {
+          setDrawer(false);
+        }
       });
       applyBtn.addEventListener('click', function () { applyRoster(true); });
       // changing a column re-reads the same sheet without re-detecting
@@ -1494,6 +1594,7 @@
       namesBox.value = seedText;
       var seeded = loadRoster(seedText, false);
       if (seeded.length >= 2) { basePool = seeded; pool = basePool.slice(); }
+      updateCard();
       buildBezel();
       prepareRound();
       draw();
