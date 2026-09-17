@@ -831,20 +831,44 @@
         listEl.scrollTop = listEl.scrollHeight;
       }
 
-      function snapTo(deg) {
-        rotation = deg;
-        wheel.style.transition = 'none';
-        wheel.style.transform = 'rotate(' + deg + 'deg)';
-        requestAnimationFrame(function () {
-          requestAnimationFrame(function () { wheel.style.transition = ''; });
-        });
+      // The wheel keeps its angle between rounds. It used to snap back to 0
+      // on a timer 1.6s after each win, and that snap set transition:none —
+      // if the next spin had already started, the running transition was
+      // cancelled, transitionend never fired, and the button stayed locked
+      // on "추첨 중…" forever.
+      var needsResample = false, roundTimer = null, spinTimer = null;
+
+      function resample() {
+        clearTimeout(roundTimer); roundTimer = null;
+        prepareRound();
+        draw();
+        needsResample = false;
       }
 
-      function newRound() { prepareRound(); draw(); snapTo(0); }
+      function finishSpin() {
+        if (!spinning) return;
+        spinning = false;
+        clearTimeout(spinTimer); spinTimer = null;
+        spinBtn.disabled = false;
+        var won = display[pendingSeg];
+        if (!won) {
+          winnerEl.innerHTML = '버튼을 눌러 추첨하세요';
+          needsResample = true;
+          return;
+        }
+        winnerEl.innerHTML = '당첨 <b>' + won.name + '</b>';
+        winners.push(won.name);
+        renderWinners();
+        if (removeChk.checked) pool.splice(won.idx, 1);
+        // let the result sit a moment, then reshuffle the visible names
+        needsResample = true;
+        roundTimer = setTimeout(resample, 1400);
+      }
 
       function spin() {
         if (spinning) return;
-        if (!pool.length) {
+        if (needsResample) resample();     // never leave a stale round behind
+        if (!pool.length || !display.length) {
           winnerEl.innerHTML = '명단이 비었습니다 · 초기화를 눌러 주세요';
           return;
         }
@@ -861,29 +885,40 @@
         var cur = ((rotation % 360) + 360) % 360;
         var delta = ((want - cur) % 360 + 360) % 360;
         rotation += turns * 360 + delta;
+        wheel.style.transition = '';       // ensure the easing is live
         wheel.style.transform = 'rotate(' + rotation + 'deg)';
+        // failsafe so a missed transitionend can never lock the wheel
+        spinTimer = setTimeout(finishSpin, 5200);
       }
 
-      wheel.addEventListener('transitionend', function () {
-        if (!spinning) return;
-        spinning = false;
-        spinBtn.disabled = false;
-        var won = display[pendingSeg];
-        if (!won) return;
-        winnerEl.innerHTML = '당첨 <b>' + won.name + '</b>';
-        winners.push(won.name);
-        renderWinners();
-        if (removeChk.checked) pool.splice(won.idx, 1);
-        // resample for the next round so every spin covers the whole pool
-        setTimeout(newRound, 1600);
+      wheel.addEventListener('transitionend', function (e) {
+        if (e.propertyName && e.propertyName !== 'transform') return;
+        finishSpin();
       });
 
-      resetBtn.addEventListener('click', function () {
-        if (spinning) return;
+      // Full reset, also the recovery path if anything ever gets stuck
+      function restore(list) {
+        clearTimeout(roundTimer); clearTimeout(spinTimer);
+        roundTimer = spinTimer = null;
+        spinning = false;
+        spinBtn.disabled = false;
         winners = [];
+        if (list) basePool = list;
         pool = basePool.slice();
+        rotation = 0;
+        wheel.style.transition = 'none';
+        wheel.style.transform = 'rotate(0deg)';
+        prepareRound();
+        draw();
+        needsResample = false;
         renderWinners();
-        newRound();
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () { wheel.style.transition = ''; });
+        });
+      }
+
+      resetBtn.addEventListener('click', function () {
+        restore(null);
         winnerEl.innerHTML = '버튼을 눌러 추첨하세요';
       });
 
@@ -897,11 +932,7 @@
           .map(function (v) { return v.trim(); })
           .filter(function (v) { return v; });
         if (list.length < 2) { winnerEl.innerHTML = '두 명 이상 입력해 주세요'; return; }
-        basePool = list;
-        pool = list.slice();
-        winners = [];
-        renderWinners();
-        newRound();
+        restore(list);
         winnerEl.innerHTML = list.length + '명 등록 완료 · 버튼을 눌러 추첨하세요';
       });
 
