@@ -209,6 +209,36 @@
     filter:blur(20px); opacity:.65;
     transition:opacity .6s ease, transform .6s ease; }
   .wheel-wrap.is-spinning .wheel-glow { opacity:1; transform:scale(1.06); }
+  /* the winner's name, ~5x the old size, laid over the dial so the dial
+     itself keeps its full size */
+  .winner-big { position:absolute; left:50%; top:50%; z-index:4;
+    transform:translate(-50%,-50%) scale(.55);
+    font-size:clamp(62px,9vw,170px); font-weight:800; line-height:1;
+    letter-spacing:.01em; color:#fff; white-space:nowrap; text-align:center;
+    text-shadow:0 0 40px rgba(30,136,255,.95), 0 0 110px rgba(30,136,255,.55),
+                0 6px 26px rgba(0,0,0,.65);
+    opacity:0; pointer-events:none;
+    transition:opacity .35s ease, transform .55s cubic-bezier(.2,1.5,.3,1); }
+  .winner-big::before { content:''; position:absolute; inset:-45% -22%; z-index:-1;
+    background:radial-gradient(ellipse at center,
+      rgba(2,8,20,.74) 0%, rgba(2,8,20,.45) 45%, transparent 72%); }
+  .wheel-wrap.show-name .winner-big { opacity:1;
+    transform:translate(-50%,-50%) scale(1); }
+
+  /* 축포 - two cannons firing from the lower corners */
+  .confetti { position:fixed; inset:0; z-index:140; pointer-events:none;
+    overflow:hidden; }
+  .confetti i { position:absolute; display:block; border-radius:2px;
+    will-change:transform, opacity;
+    animation:shoot var(--dur) cubic-bezier(.16,.68,.36,1) forwards; }
+  @keyframes shoot {
+    0%   { transform:translate3d(0,0,0) rotate(0deg); opacity:1; }
+    45%  { transform:translate3d(calc(var(--dx) * .6), var(--dy), 0)
+                     rotate(calc(var(--rot) * .5)); opacity:1; }
+    100% { transform:translate3d(var(--dx), 62vh, 0) rotate(var(--rot));
+           opacity:0; }
+  }
+
   #flash { opacity:0; transform-origin:100px 100px; pointer-events:none; }
   .wheel-wrap.is-won #flash { animation:flashOut .95s ease-out; }
   @keyframes flashOut { 0%{opacity:.9; transform:scale(.2);}
@@ -465,6 +495,7 @@
     <div class="horizon"></div>
   </div>
   <div class="vignette"></div>
+  <div class="confetti" id="confetti"></div>
 
   <!-- ===== Slides ===== -->
   <main class="deck" id="deck">
@@ -623,6 +654,7 @@
 
               <circle id="flash" cx="100" cy="100" r="95" fill="url(#flashG)" />
             </svg>
+            <div class="winner-big" id="winnerBig"></div>
           </div>
           <button class="spin-btn reveal" style="--d:.25s" id="spinBtn">돌리기</button>
           <div class="winner reveal" style="--d:.3s" id="winner">버튼을 눌러 추첨하세요</div>
@@ -809,6 +841,8 @@
       var countEl = document.getElementById('winCount');
       var resetBtn = document.getElementById('resetBtn');
       var wrap = document.getElementById('wheelWrap');
+      var bigEl = document.getElementById('winnerBig');
+      var confettiEl = document.getElementById('confetti');
       var poolCountEl = document.getElementById('poolCount');
 
       // A wheel can only carry so many legible labels. With a bigger roster we
@@ -924,6 +958,39 @@
         }
       }
 
+      // 축포: two cannons in the lower corners, arcing up and across
+      var CONF = ['#EAF4FF','#5FA8FF','#1E6FD0','#7FD8E8','#9B8CFF','#FFD98A'];
+      function fireConfetti() {
+        var frag = document.createDocumentFragment(), made = [];
+        for (var c = 0; c < 2; c++) {
+          var fromLeft = (c === 0);
+          for (var i = 0; i < 58; i++) {
+            var d = document.createElement('i');
+            var ang = (38 + Math.random() * 42) * Math.PI / 180;
+            var vel = 42 + Math.random() * 48;
+            var dx = (fromLeft ? 1 : -1) * Math.cos(ang) * vel;
+            var dy = -Math.sin(ang) * vel;
+            var w = 6 + Math.random() * 6;
+            d.style.width = w.toFixed(1) + 'px';
+            d.style.height = (w * (1 + Math.random())).toFixed(1) + 'px';
+            d.style.background = CONF[(Math.random() * CONF.length) | 0];
+            d.style.bottom = '6vh';
+            d.style[fromLeft ? 'left' : 'right'] = '4vw';
+            d.style.setProperty('--dx', dx.toFixed(1) + 'vh');
+            d.style.setProperty('--dy', dy.toFixed(1) + 'vh');
+            d.style.setProperty('--rot', ((Math.random() * 1080) | 0) + 'deg');
+            d.style.setProperty('--dur', (1.9 + Math.random() * 1.1).toFixed(2) + 's');
+            d.style.animationDelay = (Math.random() * 0.18).toFixed(2) + 's';
+            frag.appendChild(d); made.push(d);
+          }
+        }
+        confettiEl.appendChild(frag);
+        // clear them out so repeated draws don't pile up nodes
+        setTimeout(function () {
+          made.forEach(function (d) { if (d.parentNode) d.parentNode.removeChild(d); });
+        }, 3400);
+      }
+
       function renderWinners(teleportLast) {
         countEl.textContent = winners.length;
         listEl.innerHTML = '';
@@ -978,7 +1045,10 @@
         void wrap.offsetWidth;              // restart the burst animation
         wrap.classList.add('is-won');
         setTimeout(function () { wrap.classList.remove('is-won'); }, 1000);
-        winnerEl.innerHTML = '당첨 <b>' + won.name + '</b>';
+        bigEl.textContent = won.name;
+        wrap.classList.add('show-name');
+        fireConfetti();
+        winnerEl.innerHTML = '축하합니다';
         winners.push(won.name);
         renderWinners(true);
         if (removeChk.checked) pool.splice(won.idx, 1);
@@ -996,6 +1066,7 @@
         }
         spinning = true;
         spinBtn.disabled = true;
+        wrap.classList.remove('show-name');   // clear the last name before spinning
         wrap.classList.add('is-spinning');
         winnerEl.innerHTML = '추첨 중…';
 
@@ -1025,6 +1096,8 @@
         roundTimer = spinTimer = null;
         spinning = false;
         spinBtn.disabled = false;
+        wrap.classList.remove('is-spinning');
+        wrap.classList.remove('show-name');
         winners = [];
         if (list) basePool = list;
         pool = basePool.slice();
