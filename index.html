@@ -236,6 +236,8 @@
     to{opacity:1; transform:none;} }
   .winners-empty { font-size:clamp(11px,1vw,14px); color:rgba(190,215,255,.4);
     padding:4px 2px; }
+  .pool-note { font-size:clamp(10px,.92vw,13px); color:rgba(190,215,255,.5);
+    letter-spacing:.04em; }
   .reset-btn { padding:9px 18px; border-radius:999px; cursor:pointer;
     font-size:12px; font-weight:600; color:rgba(220,236,255,.9);
     background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.22);
@@ -530,6 +532,7 @@
         </div>
         <button class="spin-btn reveal" style="--d:.25s" id="spinBtn">돌리기</button>
         <div class="winner reveal" style="--d:.35s" id="winner">버튼을 눌러 추첨하세요</div>
+        <div class="pool-note reveal" style="--d:.4s" id="poolNote"></div>
         <div class="roul-opts reveal" style="--d:.45s">
           <label><input type="checkbox" id="removeWinner" checked /> 당첨자 제외</label>
           <details class="names-edit">
@@ -707,12 +710,13 @@
       }
     }, { passive: true });
 
-    // ----- Roulette wheel -----
+    // ----- Roulette wheel (scales to very large name pools) -----
     (function () {
       var wheel = document.getElementById('wheel');
       if (!wheel) return;
       var spinBtn = document.getElementById('spinBtn');
       var winnerEl = document.getElementById('winner');
+      var poolNote = document.getElementById('poolNote');
       var namesBox = document.getElementById('namesBox');
       var applyBtn = document.getElementById('applyNames');
       var removeChk = document.getElementById('removeWinner');
@@ -720,13 +724,18 @@
       var countEl = document.getElementById('winCount');
       var resetBtn = document.getElementById('resetBtn');
 
-      // Edit this list, or use 명단 편집 on the slide itself
+      // A wheel can only carry so many legible labels. With a bigger roster we
+      // show a random handful, but the draw stays uniform over everyone:
+      // sample MAX_SEG entrants at random, then land on one of them at random.
+      var MAX_SEG = 16;
+      var SVGNS = 'http://www.w3.org/2000/svg';
+
       var basePool = ['참가자 1','참가자 2','참가자 3','참가자 4',
                       '참가자 5','참가자 6','참가자 7','참가자 8'];
-      var names = basePool.slice();
+      var pool = basePool.slice();   // remaining entrants (duplicate names are fine)
+      var display = [];              // segments on the wheel: {name, idx}
       var winners = [];
-      var rotation = 0, spinning = false;
-      var SVGNS = 'http://www.w3.org/2000/svg';
+      var rotation = 0, spinning = false, pendingSeg = -1;
 
       // 0deg = 12 o'clock, angles run clockwise
       function pointAt(deg, r) {
@@ -734,21 +743,42 @@
         return [100 + r * Math.cos(a), 100 + r * Math.sin(a)];
       }
 
+      // Pick which entrants the wheel will show this round
+      function prepareRound() {
+        display = [];
+        if (pool.length <= MAX_SEG) {
+          for (var i = 0; i < pool.length; i++) display.push({ name: pool[i], idx: i });
+        } else {
+          var taken = {}, picked = 0;
+          while (picked < MAX_SEG) {
+            var r = Math.floor(Math.random() * pool.length);
+            if (taken[r]) continue;
+            taken[r] = 1; picked++;
+            display.push({ name: pool[r], idx: r });
+          }
+        }
+        poolNote.textContent = pool.length > MAX_SEG
+          ? '남은 인원 ' + pool.length + '명 중 ' + display.length +
+            '명 표시 · 추첨은 전원 대상'
+          : (pool.length ? '남은 인원 ' + pool.length + '명' : '');
+      }
+
       function draw() {
         while (wheel.firstChild) wheel.removeChild(wheel.firstChild);
-        var n = names.length;
+        var n = display.length;
         if (!n) {
-          // everyone has been drawn - show a dim placeholder ring
           var c = document.createElementNS(SVGNS, 'circle');
-          c.setAttribute('cx','100'); c.setAttribute('cy','100');
-          c.setAttribute('r','95');
-          c.setAttribute('fill','rgba(255,255,255,.05)');
-          c.setAttribute('stroke','rgba(255,255,255,.2)');
-          c.setAttribute('stroke-width','0.8');
+          c.setAttribute('cx', '100'); c.setAttribute('cy', '100');
+          c.setAttribute('r', '95');
+          c.setAttribute('fill', 'rgba(255,255,255,.05)');
+          c.setAttribute('stroke', 'rgba(255,255,255,.2)');
+          c.setAttribute('stroke-width', '0.8');
           wheel.appendChild(c);
           return;
         }
         var seg = 360 / n;
+        var fs = n <= 8 ? 7.6 : n <= 12 ? 6.4 : 5.6;
+        var cut = n <= 8 ? 10 : n <= 12 ? 8 : 6;
         for (var i = 0; i < n; i++) {
           var a0 = i * seg, a1 = (i + 1) * seg;
           var p0 = pointAt(a0, 95), p1 = pointAt(a1, 95);
@@ -767,20 +797,18 @@
           t.setAttribute('x', tp[0].toFixed(2));
           t.setAttribute('y', tp[1].toFixed(2));
           t.setAttribute('fill', '#fff');
-          t.setAttribute('font-size', n > 14 ? '5' : n > 9 ? '6.4' : '7.6');
+          t.setAttribute('font-size', String(fs));
           t.setAttribute('font-weight', '700');
           t.setAttribute('text-anchor', 'middle');
           t.setAttribute('dominant-baseline', 'middle');
           t.setAttribute('transform', 'rotate(' + mid + ' ' +
             tp[0].toFixed(2) + ' ' + tp[1].toFixed(2) + ')');
-          t.textContent = names[i].length > 10
-            ? names[i].slice(0, 10) + '…' : names[i];
+          var nm = display[i].name;
+          t.textContent = nm.length > cut ? nm.slice(0, cut) + '…' : nm;
           wheel.appendChild(t);
         }
-        namesBox.value = names.join('\n');
       }
 
-      // Right-hand list of everyone drawn so far
       function renderWinners() {
         countEl.textContent = winners.length;
         listEl.innerHTML = '';
@@ -803,32 +831,36 @@
         listEl.scrollTop = listEl.scrollHeight;
       }
 
-      function resetAll() {
-        if (spinning) return;
-        winners = [];
-        names = basePool.slice();
-        rotation = 0;
+      function snapTo(deg) {
+        rotation = deg;
         wheel.style.transition = 'none';
-        wheel.style.transform = 'rotate(0deg)';
-        draw();
-        renderWinners();
-        winnerEl.innerHTML = '버튼을 눌러 추첨하세요';
+        wheel.style.transform = 'rotate(' + deg + 'deg)';
         requestAnimationFrame(function () {
           requestAnimationFrame(function () { wheel.style.transition = ''; });
         });
       }
 
+      function newRound() { prepareRound(); draw(); snapTo(0); }
+
       function spin() {
         if (spinning) return;
-        if (!names.length) {
+        if (!pool.length) {
           winnerEl.innerHTML = '명단이 비었습니다 · 초기화를 눌러 주세요';
           return;
         }
         spinning = true;
         spinBtn.disabled = true;
         winnerEl.innerHTML = '추첨 중…';
-        // 5-8 full turns plus a random landing offset
-        rotation += 360 * (5 + Math.floor(Math.random() * 4)) + Math.random() * 360;
+
+        var n = display.length, seg = 360 / n;
+        pendingSeg = Math.floor(Math.random() * n);
+        // aim somewhere inside that segment, away from its edges
+        var target = pendingSeg * seg + seg * (0.2 + Math.random() * 0.6);
+        var turns = 5 + Math.floor(Math.random() * 4);
+        var want = ((360 - target) % 360 + 360) % 360;
+        var cur = ((rotation % 360) + 360) % 360;
+        var delta = ((want - cur) % 360 + 360) % 360;
+        rotation += turns * 360 + delta;
         wheel.style.transform = 'rotate(' + rotation + 'deg)';
       }
 
@@ -836,32 +868,26 @@
         if (!spinning) return;
         spinning = false;
         spinBtn.disabled = false;
-        var n = names.length, seg = 360 / n;
-        // the segment now under the pointer started at angle -rotation
-        var at = ((-rotation % 360) + 360) % 360;
-        var idx = Math.floor(at / seg) % n;
-        var hit = names[idx];
-        winnerEl.innerHTML = '당첨 <b>' + hit + '</b>';
-        winners.push(hit);
+        var won = display[pendingSeg];
+        if (!won) return;
+        winnerEl.innerHTML = '당첨 <b>' + won.name + '</b>';
+        winners.push(won.name);
         renderWinners();
-        if (removeChk.checked) {
-          names.splice(idx, 1);
-          setTimeout(function () {
-            rotation = 0;
-            wheel.style.transition = 'none';
-            wheel.style.transform = 'rotate(0deg)';
-            draw();
-            // restore the easing on the next frame
-            requestAnimationFrame(function () {
-              requestAnimationFrame(function () { wheel.style.transition = ''; });
-            });
-          }, 1600);
-        }
+        if (removeChk.checked) pool.splice(won.idx, 1);
+        // resample for the next round so every spin covers the whole pool
+        setTimeout(newRound, 1600);
       });
 
-      resetBtn.addEventListener('click', resetAll);
+      resetBtn.addEventListener('click', function () {
+        if (spinning) return;
+        winners = [];
+        pool = basePool.slice();
+        renderWinners();
+        newRound();
+        winnerEl.innerHTML = '버튼을 눌러 추첨하세요';
+      });
+
       spinBtn.addEventListener('click', spin);
-      // Space/Enter would also page the carousel — handle it here instead
       spinBtn.addEventListener('keydown', function (e) {
         if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); spin(); }
       });
@@ -872,19 +898,15 @@
           .filter(function (v) { return v; });
         if (list.length < 2) { winnerEl.innerHTML = '두 명 이상 입력해 주세요'; return; }
         basePool = list;
-        names = list.slice();
+        pool = list.slice();
         winners = [];
         renderWinners();
-        rotation = 0;
-        wheel.style.transition = 'none';
-        wheel.style.transform = 'rotate(0deg)';
-        draw();
-        requestAnimationFrame(function () {
-          requestAnimationFrame(function () { wheel.style.transition = ''; });
-        });
-        winnerEl.innerHTML = '버튼을 눌러 추첨하세요';
+        newRound();
+        winnerEl.innerHTML = list.length + '명 등록 완료 · 버튼을 눌러 추첨하세요';
       });
 
+      namesBox.value = basePool.join('\n');
+      prepareRound();
       draw();
       renderWinners();
     })();
