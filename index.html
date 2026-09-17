@@ -171,9 +171,10 @@
   .slide.in-view .title-rule { width:clamp(160px,18vw,320px); }
 
   /* ===== Roulette (Lucky Draw) ===== */
-  .roulette { display:flex; flex-direction:column; align-items:center; gap:2vh;
-    width:100%; }
-  .wheel-wrap { position:relative; width:min(52vh,44vw,500px); aspect-ratio:1; }
+  .roulette-layout { display:flex; align-items:center; justify-content:center;
+    gap:3vw; width:100%; }
+  .roulette { display:flex; flex-direction:column; align-items:center; gap:2vh; }
+  .wheel-wrap { position:relative; width:min(50vh,38vw,460px); aspect-ratio:1; }
   .wheel-wrap svg { width:100%; height:100%; display:block;
     filter:drop-shadow(0 14px 40px rgba(3,11,26,.65)); }
   #wheel { transform-origin:50% 50%;
@@ -210,6 +211,42 @@
   .names-edit button { margin-top:8px; padding:7px 18px; border-radius:999px;
     cursor:pointer; font-size:12px; font-weight:600; color:#fff;
     background:rgba(30,111,208,.28); border:1px solid rgba(30,111,208,.6); }
+
+  /* winner list on the right, reset at its foot */
+  .winners-panel { width:min(30vw,300px); max-height:64vh;
+    display:flex; flex-direction:column; gap:12px; padding:20px 18px;
+    border-radius:18px; background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.14);
+    -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+    box-shadow:0 10px 36px rgba(3,11,26,.45); }
+  .winners-title { font-size:clamp(11px,1.02vw,15px); letter-spacing:.22em;
+    text-transform:uppercase; font-weight:700; color:rgba(180,215,255,.9); }
+  .winners-title span { color:#fff; }
+  .winners-list { list-style:none; margin:0; padding:0; overflow-y:auto; flex:1;
+    display:flex; flex-direction:column; gap:8px; text-align:left; min-height:6em; }
+  .winners-list li { display:flex; align-items:center; gap:10px; padding:9px 12px;
+    border-radius:11px; background:rgba(30,111,208,.18);
+    border:1px solid rgba(30,111,208,.42);
+    font-size:clamp(13px,1.1vw,17px); font-weight:600;
+    animation:winPop .45s cubic-bezier(.22,1,.36,1); }
+  .winners-list li .no { flex:0 0 auto; width:22px; height:22px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:700; background:rgba(255,255,255,.16); }
+  @keyframes winPop { from{opacity:0; transform:translateX(14px) scale(.96);}
+    to{opacity:1; transform:none;} }
+  .winners-empty { font-size:clamp(11px,1vw,14px); color:rgba(190,215,255,.4);
+    padding:4px 2px; }
+  .reset-btn { padding:9px 18px; border-radius:999px; cursor:pointer;
+    font-size:12px; font-weight:600; color:rgba(220,236,255,.9);
+    background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.22);
+    transition:background .25s ease, border-color .25s ease, color .25s ease; }
+  .reset-btn:hover { background:rgba(214,64,64,.28);
+    border-color:rgba(214,64,64,.6); color:#fff; }
+
+  @media (max-width:900px) {
+    .roulette-layout { flex-direction:column; gap:2.4vh; }
+    .winners-panel { width:min(86vw,420px); max-height:30vh; }
+  }
 
   /* ===== Content panel (내용 페이지) ===== */
   .content-panel { width:min(88vw,1120px); min-height:46vh; margin-top:1vh;
@@ -481,6 +518,7 @@
 
     <!-- Lucky Draw (내용) -->
     <section id="roulette-content" class="slide">
+      <div class="roulette-layout">
       <div class="roulette">
         <div class="wheel-wrap reveal" style="--d:.1s">
           <div class="pointer"></div>
@@ -501,6 +539,13 @@
             <button id="applyNames">적용</button>
           </details>
         </div>
+      </div>
+
+      <aside class="winners-panel reveal" style="--d:.2s">
+        <div class="winners-title">당첨자 <span id="winCount">0</span></div>
+        <ol class="winners-list" id="winnersList"></ol>
+        <button class="reset-btn" id="resetBtn">초기화</button>
+      </aside>
       </div>
     </section>
 
@@ -671,10 +716,15 @@
       var namesBox = document.getElementById('namesBox');
       var applyBtn = document.getElementById('applyNames');
       var removeChk = document.getElementById('removeWinner');
+      var listEl = document.getElementById('winnersList');
+      var countEl = document.getElementById('winCount');
+      var resetBtn = document.getElementById('resetBtn');
 
       // Edit this list, or use 명단 편집 on the slide itself
-      var names = ['참가자 1','참가자 2','참가자 3','참가자 4',
-                   '참가자 5','참가자 6','참가자 7','참가자 8'];
+      var basePool = ['참가자 1','참가자 2','참가자 3','참가자 4',
+                      '참가자 5','참가자 6','참가자 7','참가자 8'];
+      var names = basePool.slice();
+      var winners = [];
       var rotation = 0, spinning = false;
       var SVGNS = 'http://www.w3.org/2000/svg';
 
@@ -687,7 +737,17 @@
       function draw() {
         while (wheel.firstChild) wheel.removeChild(wheel.firstChild);
         var n = names.length;
-        if (!n) return;
+        if (!n) {
+          // everyone has been drawn - show a dim placeholder ring
+          var c = document.createElementNS(SVGNS, 'circle');
+          c.setAttribute('cx','100'); c.setAttribute('cy','100');
+          c.setAttribute('r','95');
+          c.setAttribute('fill','rgba(255,255,255,.05)');
+          c.setAttribute('stroke','rgba(255,255,255,.2)');
+          c.setAttribute('stroke-width','0.8');
+          wheel.appendChild(c);
+          return;
+        }
         var seg = 360 / n;
         for (var i = 0; i < n; i++) {
           var a0 = i * seg, a1 = (i + 1) * seg;
@@ -720,8 +780,50 @@
         namesBox.value = names.join('\n');
       }
 
+      // Right-hand list of everyone drawn so far
+      function renderWinners() {
+        countEl.textContent = winners.length;
+        listEl.innerHTML = '';
+        if (!winners.length) {
+          var e = document.createElement('div');
+          e.className = 'winners-empty';
+          e.textContent = '아직 당첨자가 없습니다';
+          listEl.appendChild(e);
+          return;
+        }
+        winners.forEach(function (w, i) {
+          var li = document.createElement('li');
+          var no = document.createElement('span');
+          no.className = 'no';
+          no.textContent = i + 1;
+          li.appendChild(no);
+          li.appendChild(document.createTextNode(w));
+          listEl.appendChild(li);
+        });
+        listEl.scrollTop = listEl.scrollHeight;
+      }
+
+      function resetAll() {
+        if (spinning) return;
+        winners = [];
+        names = basePool.slice();
+        rotation = 0;
+        wheel.style.transition = 'none';
+        wheel.style.transform = 'rotate(0deg)';
+        draw();
+        renderWinners();
+        winnerEl.innerHTML = '버튼을 눌러 추첨하세요';
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () { wheel.style.transition = ''; });
+        });
+      }
+
       function spin() {
-        if (spinning || names.length < 2) return;
+        if (spinning) return;
+        if (!names.length) {
+          winnerEl.innerHTML = '명단이 비었습니다 · 초기화를 눌러 주세요';
+          return;
+        }
         spinning = true;
         spinBtn.disabled = true;
         winnerEl.innerHTML = '추첨 중…';
@@ -740,7 +842,9 @@
         var idx = Math.floor(at / seg) % n;
         var hit = names[idx];
         winnerEl.innerHTML = '당첨 <b>' + hit + '</b>';
-        if (removeChk.checked && n > 1) {
+        winners.push(hit);
+        renderWinners();
+        if (removeChk.checked) {
           names.splice(idx, 1);
           setTimeout(function () {
             rotation = 0;
@@ -755,6 +859,7 @@
         }
       });
 
+      resetBtn.addEventListener('click', resetAll);
       spinBtn.addEventListener('click', spin);
       // Space/Enter would also page the carousel — handle it here instead
       spinBtn.addEventListener('keydown', function (e) {
@@ -766,7 +871,10 @@
           .map(function (v) { return v.trim(); })
           .filter(function (v) { return v; });
         if (list.length < 2) { winnerEl.innerHTML = '두 명 이상 입력해 주세요'; return; }
-        names = list;
+        basePool = list;
+        names = list.slice();
+        winners = [];
+        renderWinners();
         rotation = 0;
         wheel.style.transition = 'none';
         wheel.style.transform = 'rotate(0deg)';
@@ -778,6 +886,7 @@
       });
 
       draw();
+      renderWinners();
     })();
 
     render();
