@@ -146,8 +146,8 @@
     text-transform:uppercase; font-weight:600; color:rgba(180,215,255,.9);
     padding-left:.5em; }
   .kicker { margin-bottom:2.6vh; }
-  .headline { font-size:clamp(76px,11.2vw,192px); font-weight:800; letter-spacing:.02em;
-    line-height:1.06; color:var(--white); text-wrap:balance;
+  .headline { font-size:clamp(32px,5vw,96px); font-weight:800; letter-spacing:.02em;
+    line-height:1.06; color:var(--white); white-space:nowrap;
     text-shadow:0 0 34px rgba(30,136,255,.5),0 0 70px rgba(30,136,255,.22); }
   .subhead { margin-top:2.4vh; font-size:clamp(15px,1.6vw,24px); font-weight:400;
     letter-spacing:.02em; color:rgba(214,232,255,.82); max-width:900px; }
@@ -627,7 +627,7 @@
 
     <!-- Lucky Draw (제목) -->
     <section id="roulette" class="slide">
-      <h2 class="headline reveal" style="--d:.3s; font-size:clamp(60px,8.4vw,136px)">Lucky Draw 돌려돌려 돌림판</h2>
+      <h2 class="headline reveal" style="--d:.3s">Lucky Draw 돌려돌려 돌림판</h2>
       <div class="rule" style="--d:.55s"></div>
     </section>
 
@@ -815,7 +815,39 @@
       i = Math.max(0, Math.min(TOTAL - 1, i));
       if (i === current) return;
       current = i;
-      render();
+      // ----- Titles: as large as they can be on one line -----
+    // Measured rather than guessed: the size that fits depends on the font
+    // actually in use (SamsungOne vs a fallback) and on the viewport.
+    (function () {
+      var titles = Array.prototype.slice.call(document.querySelectorAll('.headline'));
+      if (!titles.length) return;
+
+      function fitTitles() {
+        titles.forEach(function (h) {
+          h.style.fontSize = '100px';            // measure at a known size
+          var avail = h.clientWidth;             // block width = slide content
+          var need = h.scrollWidth;              // full text width, unwrapped
+          if (!avail || !need) return;
+          // width scales linearly with font-size, so one ratio lands it
+          var size = 100 * (avail * 0.98) / need;
+          size = Math.max(28, Math.min(size, 280));
+          h.style.fontSize = size.toFixed(1) + 'px';
+        });
+      }
+
+      fitTitles();
+      // remeasure once the real font is in use, and on any resize
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(fitTitles).catch(function () {});
+      }
+      var t = null;
+      window.addEventListener('resize', function () {
+        clearTimeout(t);
+        t = setTimeout(fitTitles, 150);
+      });
+    })();
+
+    render();
     }
     function next() { goTo(current + 1); }
     function prev() { goTo(current - 1); }
