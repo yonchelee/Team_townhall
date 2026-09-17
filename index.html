@@ -274,7 +274,7 @@
      The radial rotation lives on a wrapping <g>, so this CSS transform is
      free to drive the flap without clobbering it. */
   #wheel g.lbl { transform-box:fill-box; transform-origin:center; }
-  #wheel g.lbl.flip { animation:flapFlip .4s cubic-bezier(.4,0,.6,1); }
+  #wheel g.lbl.flip { animation:flapFlip .2s cubic-bezier(.4,0,.6,1); }
   @keyframes flapFlip {
     0%   { transform:scaleY(1);   opacity:1; }
     42%  { transform:scaleY(.06); opacity:.5; }
@@ -1239,23 +1239,26 @@
             if (labels[i] !== L || !display[i]) return;
             L.nm.textContent = clip(display[i].n);
             if (L.dp) L.dp.textContent = clip(display[i].d || '');
-          }, 165),
+          }, 80),
           setTimeout(function () {
             L.g.classList.remove('flip');
             delete flipTimers[i];
-          }, 430)
+          }, 210)
         ];
       }
 
-      // Never runs mid-spin: the winner is read from display[], so mutating it
-      // then would desync the announced name from the slice under the pointer.
+      // Keeps running through the spin so the dial stays alive while it turns.
+      // The slice that will win is left untouched: the winner is read from
+      // display[], so changing it mid-spin would desync the announced name
+      // from whatever the pointer lands on.
       function flipSome() {
-        if (spinning || !display.length) return;
+        if (!display.length) return;
         if (pool.length <= display.length) return;
         var used = {};
         display.forEach(function (d) { used[d.idx] = 1; });
         for (var k = 0; k < 3; k++) {
           var slot = Math.floor(Math.random() * display.length);
+          if (spinning && slot === pendingSeg) continue;   // freeze the winner
           var ni = -1;
           for (var t = 0; t < 40; t++) {
             var c = Math.floor(Math.random() * pool.length);
@@ -1268,7 +1271,7 @@
           flipLabel(slot);
         }
       }
-      setInterval(flipSome, 500);
+      setInterval(flipSome, 200);
 
       // ---------- spin lifecycle ----------
       function resample() {
