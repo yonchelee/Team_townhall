@@ -171,7 +171,7 @@
   .slide.in-view .title-rule { width:clamp(160px,18vw,320px); }
 
   /* ===== Lucky Draw: names | dial | winners ===== */
-  .slide--draw { padding:3vh 2vw; }
+  .slide--draw { padding:2vh 2vw 8vh; }   /* the bottom band belongs to the pager */
   .draw-layout { display:flex; align-items:center; justify-content:center;
     gap:clamp(12px,1.5vw,28px); width:100%; }
   /* Equal-width side columns put the dial on the page centre line. The
@@ -289,7 +289,7 @@
     font-size:clamp(10px,.95vw,13px); color:rgba(190,215,255,.75); }
 
   /* ----- the drum, sized to fill the middle column ----- */
-  .roulette { flex:0 0 auto; width:min(80vh,48vw); display:flex;
+  .roulette { flex:0 0 auto; width:min(72vh,48vw); display:flex;
     flex-direction:column; align-items:center; gap:1.3vh; }
   .drum-wrap { position:relative; width:100%; aspect-ratio:1; }
   .drum-wrap canvas { width:100%; height:100%; display:block; }
@@ -341,6 +341,15 @@
   .spin-btn:hover:not([disabled]) { transform:translateY(-2px);
     background:rgba(30,111,208,.45); box-shadow:0 10px 32px rgba(30,111,208,.5); }
   .spin-btn[disabled] { opacity:.45; cursor:default; }
+  .drum-actions { display:flex; flex-direction:column; align-items:center; gap:10px; }
+  /* the blower is the presenter's "show them it's mixed" control */
+  .spin-btn--mix { padding:9px 28px; font-size:clamp(12px,1.1vw,17px); font-weight:600;
+    background:rgba(255,255,255,.07); border-color:rgba(255,255,255,.28);
+    box-shadow:0 6px 22px rgba(3,11,26,.4); }
+  .spin-btn--mix:hover:not([disabled]) { background:rgba(255,255,255,.14);
+    box-shadow:0 10px 28px rgba(3,11,26,.5); }
+  .spin-btn--mix.on { background:rgba(127,216,232,.22); border-color:rgba(127,216,232,.8);
+    color:#EAFBFF; box-shadow:0 0 26px 2px rgba(127,216,232,.45); }
   .winner { min-height:1.4em; font-size:clamp(18px,2.2vw,34px); font-weight:800;
     letter-spacing:.02em; color:rgba(214,232,255,.75); }
   .winner b { color:#fff; text-shadow:0 0 26px rgba(30,136,255,.85),
@@ -735,7 +744,10 @@
               <div class="wb-dept" id="wbDept"></div>
             </div>
           </div>
-          <button class="spin-btn reveal" style="--d:.25s" id="spinBtn">추첨 시작</button>
+          <div class="drum-actions reveal" style="--d:.25s">
+            <button class="spin-btn spin-btn--mix" id="mixBtn">공섞기</button>
+            <button class="spin-btn" id="spinBtn">추첨 시작</button>
+          </div>
           <div class="winner reveal" style="--d:.3s" id="winner"></div>
         </div>
 
@@ -998,7 +1010,8 @@
       var pool = [];                      // entrants still in the drum {n, d, no}
       var winners = [];
       var balls = [];                     // one per entrant in pool
-      var phase = 'idle';                 // idle | mixing | gate | drop | won
+      var phase = 'idle';                 // idle | blow | mixing | gate | drop | won
+      var mixBtn = document.getElementById('mixBtn');
       var phaseStart = 0, gateOpen = false, ejected = null;
       var S = 0, cx = 0, cy = 0, R = 0, BR = 0, gateY = 0, trayY = 0;
       var chuteW = 0, gateHalf = 0, gateBase = 0;
@@ -1279,17 +1292,23 @@
 
       function step(dt, now) {
         var mixing = (phase === 'mixing');
+        var blowing = mixing || (phase === 'blow');
         var pouring = (phase === 'gate');
         // idle/won: the drum turns as a body so the balls keep circling.
-        // mixing: no rotation, hard isotropic jitter, no gravity — a gas, so
-        //         positions decorrelate from wherever the balls started.
+        // blow/mixing: gravity on and an air jet from the floor — balls over
+        //         the nozzle are lifted up the middle, spill outward at the
+        //         top and slide back down the sides into the jet. The floor
+        //         is coned so the pile keeps feeding the nozzle. The draw's
+        //         own mixing adds harder jitter on top of the same jet.
         // gate:   gravity on, gentle jitter, no rotation — the balls pour
         //         toward the opening and one falls through.
-        var OM = (mixing || pouring) ? 0 : 1.15;
-        var AG = mixing ? S * 9 : pouring ? S * 1.6 : S * 1.5;
-        var G  = mixing ? 0 : pouring ? S * 2.0 : S * 0.05;
-        var DAMP = mixing ? 0.996 : pouring ? 0.99 : 0.998;
+        var OM = (blowing || pouring) ? 0 : 1.15;
+        var AG = mixing ? S * 5 : blowing ? S * 2.5 : pouring ? S * 1.6 : S * 1.5;
+        var G  = blowing ? S * 2.4 : pouring ? S * 2.0 : S * 0.05;
+        var DAMP = blowing ? 0.992 : pouring ? 0.99 : 0.998;
         var VMAX = S * 2.2;
+        // the blower pulses like a real fan, so the plume breathes
+        var JET = S * 7 * (0.9 + 0.25 * Math.sin(now * 0.009) + 0.12 * Math.sin(now * 0.023));
 
         for (var i = 0; i < balls.length; i++) {
           var b = balls[i];
@@ -1304,6 +1323,15 @@
             var vt2 = vt + dvt;
             var cen = (vt2 * vt2 / rr) * dt;
             b.vx -= (ox / rr) * cen; b.vy -= (oy / rr) * cen;
+          }
+          if (blowing) {
+            var h = (R - oy) / (2 * R);                 // 0 at the floor, 1 at the top
+            var w = R * (0.16 + 0.55 * h);              // the plume widens as it rises
+            var inJet = Math.exp(-(ox * ox) / (w * w));
+            var lift = JET * inJet * Math.max(0, 1.15 - h);
+            b.vy -= lift * dt;
+            b.vx += (ox / w) * lift * 0.22 * dt;        // spill outward inside the plume
+            if (h < 0.3) b.vx -= (ox > 0 ? 1 : -1) * S * 0.7 * dt;   // coned floor feeds the nozzle
           }
           b.vy += G * dt;
           b.vx += (Math.random() - 0.5) * AG * dt;
@@ -1463,6 +1491,18 @@
 
       // ---------- draw lifecycle ----------
       var roundTimer = null;
+      function setBlow(on) {
+        if (on && phase !== 'idle' && phase !== 'won') return;
+        if (!on && phase !== 'blow') return;
+        clearTimeout(roundTimer); roundTimer = null;
+        phase = on ? 'blow' : 'idle';
+        if (on) ejected = null;
+        wrap.classList.toggle('is-mixing', on);
+        if (mixBtn) { mixBtn.classList.toggle('on', on); mixBtn.textContent = on ? '섞기 멈춤' : '공섞기'; }
+        if (on) winnerEl.innerHTML = '바람으로 섞는 중';
+        else if (winnerEl.innerHTML === '바람으로 섞는 중') winnerEl.innerHTML = '';
+      }
+
       function startDraw() {
         if (phase === 'mixing' || phase === 'gate' || phase === 'drop') return;
         if (!pool.length || !balls.length) {
@@ -1476,6 +1516,7 @@
         wrap.classList.remove('show-name');
         phase = 'mixing'; phaseStart = performance.now();
         spinBtn.disabled = true;
+        if (mixBtn) { mixBtn.disabled = true; mixBtn.classList.remove('on'); mixBtn.textContent = '공섞기'; }
         wrap.classList.add('is-mixing');
         winnerEl.innerHTML = '섞는 중…';
         balls.forEach(function (b) {
@@ -1502,6 +1543,7 @@
         var won = ejected ? ejected.ent : null;
         phase = 'won';
         spinBtn.disabled = false;
+        if (mixBtn) mixBtn.disabled = false;
         if (!won) { winnerEl.innerHTML = ''; return; }
         var bi = balls.indexOf(ejected);
         if (bi >= 0) balls.splice(bi, 1);         // it has physically left the drum
@@ -1645,6 +1687,7 @@
         clearTimeout(roundTimer); roundTimer = null;
         phase = 'idle'; ejected = null; setGate(false);
         spinBtn.disabled = false;
+        if (mixBtn) { mixBtn.disabled = false; mixBtn.classList.remove('on'); mixBtn.textContent = '공섞기'; }
         wrap.classList.remove('is-mixing');
         wrap.classList.remove('show-name');
         winners = [];
@@ -1695,6 +1738,7 @@
         winnerEl.innerHTML = '';
       });
       spinBtn.addEventListener('click', startDraw);
+      if (mixBtn) mixBtn.addEventListener('click', function () { setBlow(phase !== 'blow'); });
       spinBtn.addEventListener('keydown', function (e) {
         if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); startDraw(); }
       });
