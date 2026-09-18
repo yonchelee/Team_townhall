@@ -2766,18 +2766,21 @@
 
       // ---------- camera & loop ----------
       function updateCamera(dt) {
-        if (phase === 'race' && ranks.length) {
-          // first place is home: watch the line as the rest come in
-          cam.tz = 2.0; cam.ty = GOAL_Y - 3; cam.tx = WW / 2;
-        } else if (phase === 'race') {
-          var lead = leaders(1);
+        if (phase === 'race') {
+          // frame the marbles still racing for the places left to decide:
+          // all five at first, then fewer as they come home
+          var lead = leaders(Math.max(1, RANKS - ranks.length));
           if (lead.length) {
-            var ly = lead[0].y;
-            var near = Math.max(0, 1 - Math.max(0, GOAL_Y - 22 - ly) / 30);   // 0 far, 1 at the goal
-            cam.tz = 1 + 1.4 * near;
-            var vh = viewH / cam.tz;
-            cam.ty = ly + vh * 0.22;
-            cam.tx = WW / 2;
+            var top = lead[0].y, bottom = lead[lead.length - 1].y, mx = 0;
+            for (var li = 0; li < lead.length; li++) mx += lead[li].x;
+            mx /= lead.length;
+            var near = Math.max(0, 1 - Math.max(0, GOAL_Y - 22 - top) / 30);   // 0 far, 1 at the goal
+            var zGoal = 1 + 1.4 * near;
+            var zFit = (viewH * 0.55) / Math.max(4, top - bottom + 4);          // keep the group in view
+            cam.tz = Math.max(1, Math.min(zGoal, zFit));
+            var vh = viewH / cam.tz, hw = WW / cam.tz / 2;
+            cam.ty = (top + bottom) / 2 + vh * 0.12;
+            cam.tx = Math.max(hw, Math.min(WW - hw, mx));
           }
         } else if (phase === 'won' && ranks.length) {
           cam.tz = 2.0; cam.ty = GOAL_Y + 1.5; cam.tx = WW / 2;
@@ -2856,11 +2859,16 @@
         if (b.rank === 1) {
           ejected = b; firstAt = now;
           wrap.classList.remove('is-mixing');
-          wbName.textContent = b.ent.n;
-          wbDept.textContent = 'No.' + b.ent.no + (b.ent.d ? ' · ' + b.ent.d : '');
-          wrap.classList.add('show-name');
           fireConfetti();
           winnerEl.innerHTML = '골인! 축하합니다';
+        }
+        if (b.rank <= RANKS) {
+          // 1등, 2등, … each takes the centre as it crosses the line
+          wbName.textContent = b.rank + '등 ' + b.ent.n;
+          wbDept.textContent = 'No.' + b.ent.no + (b.ent.d ? ' · ' + b.ent.d : '');
+          wrap.classList.remove('show-name');
+          void wrap.offsetWidth;                    // restart the entrance animation
+          wrap.classList.add('show-name');
         }
         if (b.rank <= winRank) addWinner(b.ent);
         if (ranks.length >= RANKS) endRace();
