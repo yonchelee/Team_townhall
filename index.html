@@ -973,7 +973,7 @@
       var phase = 'idle';        // idle | mixing | eject | won
       var phaseT = 0, pendingIdx = -1, ejected = null;
       var S = 0, cx = 0, cy = 0, R = 0, BR = 0, gateY = 0, trayY = 0, chuteW = 0;
-      var showLabels = true, passes = 3, grid = {}, cell = 0;
+      var showLabels = true, passes = 3, grid = {}, cell = 0, displayCap = 30;
       var shared = [], bgLayer = null, fgLayer = null, DPR = 1;
 
       var PALETTE = [
@@ -1159,37 +1159,71 @@
         fgLayer = F.c;
       }
 
+      // A name needs a ball of at least MINR to stay readable, and that caps
+      // how many can be in the drum at once — 1000 legible balls would need a
+      // container wider than the screen. So the drum holds as many as can be
+      // read and cycles which entrants are in it; the draw still covers all.
       function sizeBalls() {
-        var n = Math.max(1, display.length || 1);
-        // a big crowd gets looser packing so the churn reads as separate
-        // balls rather than one solid mass
-        var FILL = n <= 400 ? 0.44 : 0.34;
-        BR = R * Math.sqrt(FILL / n);
-        BR = Math.max(R * 0.016, Math.min(BR, R * 0.125));
-        showLabels = BR >= 11.5;
-        passes = n <= 150 ? 3 : 4;
+        var FILL = 0.42, MINR = 13.5;
+        var legible = Math.max(24, Math.floor(FILL * (R / MINR) * (R / MINR)));
+        var n = Math.min(pool.length || 1, legible, MAX_BALLS);
+        displayCap = Math.max(1, n);
+        BR = R * Math.sqrt(FILL / displayCap);
+        BR = Math.max(MINR, Math.min(BR, R * 0.125));
+        showLabels = true;
+        passes = displayCap <= 150 ? 3 : 4;
       }
 
       function prepareRound() {
+        sizeBalls();
         display = [];
-        if (pool.length <= MAX_BALLS) {
+        if (pool.length <= displayCap) {
           for (var i = 0; i < pool.length; i++)
             display.push({ n: pool[i].n, d: pool[i].d, idx: i });
         } else {
-          // only past the guard do we fall back to a random subset; the draw
-          // stays uniform because the subset is uniform and so is the pick
+          // a uniform subset, then a uniform pick within it, is still a
+          // uniform draw over everyone
           var taken = {}, got = 0;
-          while (got < MAX_BALLS) {
+          while (got < displayCap) {
             var r = Math.floor(Math.random() * pool.length);
             if (taken[r]) continue;
             taken[r] = 1; got++;
             display.push({ n: pool[r].n, d: pool[r].d, idx: r });
           }
         }
-        sizeBalls();
         spawnBalls();
         updateCard();
       }
+
+      // While the drum idles, keep swapping who is in it so a big roster all
+      // passes through. Never during a spin: the winner is read from display[].
+      function cycleBalls() {
+        if (phase !== 'idle') return;
+        if (pool.length <= display.length) return;
+        var used = {};
+        display.forEach(function (d) { used[d.idx] = 1; });
+        var swaps = Math.max(1, Math.round(display.length * 0.07));
+        for (var k = 0; k < swaps; k++) {
+          var slot = Math.floor(Math.random() * display.length);
+          var ni = -1;
+          for (var t = 0; t < 40; t++) {
+            var c = Math.floor(Math.random() * pool.length);
+            if (!used[c]) { ni = c; break; }
+          }
+          if (ni < 0) continue;
+          delete used[display[slot].idx];
+          used[ni] = 1;
+          display[slot] = { n: pool[ni].n, d: pool[ni].d, idx: ni };
+          var b = balls[slot];
+          if (b) {
+            b.label = pool[ni].n;
+            b.sprite = makeSprite(b.c1, b.c2, shortName(b.label), BR);
+            b.flash = performance.now();
+          }
+        }
+        updateCard();
+      }
+      setInterval(cycleBalls, 900);
 
       // One gradient per ball per frame was costing ~4fps at a thousand
        // balls, so each ball is baked into a small canvas once and blitted.
@@ -1361,6 +1395,15 @@
         }
         ctx.drawImage(sp, b.x - w / 2, b.y - w / 2, w, w);
         if (glow) ctx.shadowBlur = 0;
+        if (b.flash) {
+          var el = performance.now() - b.flash;
+          if (el < 260) {
+            ctx.globalAlpha = 0.5 * (1 - el / 260);
+            ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 1.06, 0, 6.2832);
+            ctx.fillStyle = '#fff'; ctx.fill();
+            ctx.globalAlpha = 1;
+          } else { b.flash = 0; }
+        }
       }
 
       function render() {
@@ -1515,7 +1558,9 @@
         if (rcRemain) rcRemain.textContent = left;
         if (rcTotal) rcTotal.textContent = total;
         if (rcBar) rcBar.style.width = total ? (drawn / total * 100).toFixed(1) + '%' : '0%';
-        if (rcMeta) rcMeta.textContent = '추첨 ' + drawn + '명 완료';
+        if (rcMeta) rcMeta.textContent = '추첨 ' + drawn + '명 완료' +
+          (display.length && left > display.length
+            ? ' · 통에 ' + display.length + '명 순환' : '');
         if (rcDept) {
           var seen = {}, n = 0;
           basePool.forEach(function (e) {
