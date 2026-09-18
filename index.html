@@ -203,6 +203,27 @@
     background:linear-gradient(90deg,var(--deep-blue),var(--bright-blue));
     box-shadow:0 0 12px 1px var(--accent-glow); transition:width .6s ease; }
   .rc-meta { font-size:clamp(11px,1.05vw,15px); color:rgba(190,215,255,.7); }
+  /* Ball-number board: the audience matches the number on the drawn ball to
+     a name here, so it lists every entrant and loops when it overflows */
+  .roster-board { height:38vh; overflow:hidden; border-radius:12px;
+    background:rgba(3,11,26,.35); border:1px solid rgba(255,255,255,.1);
+    -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 8%,#000 92%,transparent 100%);
+    mask-image:linear-gradient(180deg,transparent 0,#000 8%,#000 92%,transparent 100%); }
+  .roster-board ul { list-style:none; margin:0; padding:8px 12px; }
+  .roster-board li { display:flex; align-items:baseline; gap:10px;
+    padding:4px 0; font-size:clamp(12px,1.15vw,17px); line-height:1.35;
+    color:rgba(232,242,255,.92); border-bottom:1px solid rgba(255,255,255,.05); }
+  .roster-board li .no { flex:0 0 3.2em; font-weight:800; color:#FFE39A;
+    font-variant-numeric:tabular-nums; }
+  .roster-board li .nm { font-weight:600; white-space:nowrap; }
+  .roster-board li .d { color:rgba(190,215,255,.62); font-size:.85em;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+  .roster-board li.drawn { opacity:.32; }
+  .roster-board li.drawn .nm, .roster-board li.drawn .d { text-decoration:line-through; }
+  .roster-board li.drawn .no { color:rgba(255,227,154,.5); }
+  .roster-board.scroll ul { animation:rosterScroll var(--dur,60s) linear infinite; }
+  .roster-board:hover ul { animation-play-state:paused; }
+  @keyframes rosterScroll { to { transform:translateY(-50%); } }
   .rc-btn { margin-top:auto; padding:11px 18px; border-radius:999px;
     cursor:pointer; font-size:clamp(12px,1.15vw,16px); font-weight:600;
     color:rgba(220,236,255,.92); background:rgba(255,255,255,.07);
@@ -385,6 +406,7 @@
       max-height:34vh; }
     .roulette { flex:1 1 100%; order:-1; width:auto; }
     .drum-wrap { width:min(52vh,88vw); }
+    .roster-board { height:24vh; }
     .winners-list { min-height:14vh; }
   }
 
@@ -697,6 +719,9 @@
             </div>
             <div class="rc-bar"><i id="rcBar"></i></div>
             <div class="rc-meta" id="rcMeta">추첨 0명 완료</div>
+            <div class="roster-board" id="rosterBoard" aria-label="번호별 명단">
+              <ul id="rosterList"></ul>
+            </div>
             <button class="rc-btn" id="openRoster">명단 설정</button>
           </aside>
         </div>
@@ -919,11 +944,16 @@
       });
     })();
 
-    // ----- Lucky Draw: ball drum, roster, winners -----
-    // Physics is hand-rolled rather than pulled from a CDN: this deck runs on
-    // a corporate network that blocks most outside hosts, and a blocked script
-    // would leave the draw dead on stage. Circles bouncing inside a circle is
-    // a short bit of maths, so the file stays self-contained.
+    // ----- Lucky Draw: ball drum with a physical gate -----
+    // Fairness here has to be visible, not just statistical. So:
+    //   * every entrant's ball is in the drum, numbered — nothing is sampled
+    //   * nothing pre-selects a winner: the code never picks an index
+    //   * after mixing, a gate opens at the bottom and whichever ball falls
+    //     through under the simulated physics is the winner
+    //   * the exit is passive — no ball is steered, tweened or pulled to it
+    // The presenter cannot influence the outcome once 추첨 시작 is pressed.
+    // Physics is hand-rolled rather than pulled from a CDN, because this deck
+    // runs on a corporate network that blocks most outside hosts.
     (function () {
       var cv = document.getElementById('drum');
       if (!cv) return;
@@ -948,17 +978,16 @@
       var rcBar     = document.getElementById('rcBar');
       var rcMeta    = document.getElementById('rcMeta');
       var rcDept    = document.getElementById('rcDept');
+      var boardEl   = document.getElementById('rosterBoard');
+      var boardList = document.getElementById('rosterList');
       var drawer    = document.getElementById('rosterDrawer');
       var openBtn   = document.getElementById('openRoster');
 
-      // Every entrant goes in the drum. The ball radius is derived from the
-      // head count so they always fit: readable names up to a few hundred,
-      // and past that a dense churn of unlabelled balls - which is what a
-      // real machine with a thousand balls looks like anyway.
-      var MAX_BALLS = 1500;
+      var MAX_BALLS = 1500;               // performance guard only
       var STORE = 'luckydraw.roster';
       var FONT = '"SamsungOneKoreanOTF","Malgun Gothic","Apple SD Gothic Neo",sans-serif';
-      var MIX_MS = 3800, EJECT_MS = 1250;
+      var MIX_MS = 4000;                  // turbulent mixing before the gate opens
+      var GATE_SLOW_MS = 6000;            // past this, widen the gate so a jam clears
 
       var basePool = [
         { n: '참가자 1', d: '기구개발팀' }, { n: '참가자 2', d: '기구개발팀' },
@@ -966,14 +995,14 @@
         { n: '참가자 5', d: '설계파트' },  { n: '참가자 6', d: '설계파트' },
         { n: '참가자 7', d: '선행개발' },  { n: '참가자 8', d: '선행개발' }
       ];
-      var pool = basePool.slice();
-      var display = [];          // entrants currently loaded as balls
+      var pool = [];                      // entrants still in the drum {n, d, no}
       var winners = [];
-      var balls = [];
-      var phase = 'idle';        // idle | mixing | eject | won
-      var phaseT = 0, pendingIdx = -1, ejected = null;
-      var S = 0, cx = 0, cy = 0, R = 0, BR = 0, gateY = 0, trayY = 0, chuteW = 0;
-      var showLabels = true, passes = 3, grid = {}, cell = 0, displayCap = 30;
+      var balls = [];                     // one per entrant in pool
+      var phase = 'idle';                 // idle | mixing | gate | drop | won
+      var phaseStart = 0, gateOpen = false, ejected = null;
+      var S = 0, cx = 0, cy = 0, R = 0, BR = 0, gateY = 0, trayY = 0;
+      var chuteW = 0, gateHalf = 0, gateBase = 0;
+      var showNums = true, passes = 3, grid = {}, cell = 0;
       var shared = [], bgLayer = null, fgLayer = null, DPR = 1;
 
       var PALETTE = [
@@ -991,11 +1020,10 @@
         cv.height = Math.round(S * dpr);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         cx = S / 2; cy = S * 0.415; R = S * 0.415;
-        sizeBalls();
-        buildChrome();
         gateY = cy + R;
         trayY = S * 0.93;
-        chuteW = BR * 2.6;
+        sizeBalls();
+        buildChrome();
       }
 
       // ---------- roster parsing ----------
@@ -1093,144 +1121,25 @@
         return out;
       }
 
-      // ---------- load the drum ----------
-      // radius that packs `n` balls into the drum at a comfortable density
-      // everything that never moves, drawn once into two layers
-      function layer() {
-        var c = document.createElement('canvas');
-        c.width = Math.round(S * DPR); c.height = Math.round(S * DPR);
-        var g = c.getContext('2d');
-        g.setTransform(DPR, 0, 0, DPR, 0, 0);
-        return { c: c, g: g };
-      }
-
-      function rr(g, x, y, w, h, r) {
-        g.beginPath();
-        g.moveTo(x + r, y);
-        g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r);
-        g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-        g.lineTo(x + r, y + h); g.quadraticCurveTo(x, y + h, x, y + h - r);
-        g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y);
-        g.closePath();
-      }
-
-      function buildChrome() {
-        var cwl = cx - chuteW / 2;
-        var B = layer(), g = B.g;
-        // outer shadow, baked in rather than left to a CSS filter
-        g.save();
-        g.shadowColor = 'rgba(3,11,26,.75)'; g.shadowBlur = S * 0.05;
-        g.shadowOffsetY = S * 0.016;
-        g.beginPath(); g.arc(cx, cy, R, 0, 6.2832);
-        g.fillStyle = 'rgba(8,24,52,.5)'; g.fill();
-        g.restore();
-        // chute and tray
-        rr(g, cwl, gateY - R * 0.05, chuteW, trayY - gateY + R * 0.1, chuteW * 0.3);
-        g.fillStyle = 'rgba(12,34,70,.55)'; g.fill();
-        g.lineWidth = Math.max(1, S * 0.004);
-        g.strokeStyle = 'rgba(160,205,255,.32)'; g.stroke();
-        rr(g, cx - chuteW * 0.92, trayY - chuteW * 0.16, chuteW * 1.84,
-           chuteW * 0.52, chuteW * 0.22);
-        g.fillStyle = 'rgba(10,30,62,.7)'; g.fill();
-        g.strokeStyle = 'rgba(160,205,255,.3)'; g.stroke();
-        // glass body
-        var bgg = g.createRadialGradient(cx - R * 0.3, cy - R * 0.35, R * 0.08, cx, cy, R);
-        bgg.addColorStop(0, 'rgba(130,185,255,.12)');
-        bgg.addColorStop(0.65, 'rgba(24,64,124,.16)');
-        bgg.addColorStop(1, 'rgba(6,20,45,.34)');
-        g.beginPath(); g.arc(cx, cy, R, 0, 6.2832);
-        g.fillStyle = bgg; g.fill();
-        bgLayer = B.c;
-
-        var F = layer(), f = F.g;
-        f.beginPath(); f.arc(cx, cy, R, 0, 6.2832);
-        f.lineWidth = R * 0.035;
-        f.strokeStyle = 'rgba(185,222,255,.5)';
-        f.shadowColor = 'rgba(60,140,255,.85)'; f.shadowBlur = R * 0.13;
-        f.stroke();
-        f.shadowBlur = 0;
-        f.beginPath();
-        f.arc(cx, cy, R * 0.9, Math.PI * 1.06, Math.PI * 1.48);
-        f.lineWidth = R * 0.055;
-        f.strokeStyle = 'rgba(255,255,255,.2)'; f.stroke();
-        f.beginPath(); f.arc(cx, cy, R * 0.965, 0, 6.2832);
-        f.lineWidth = R * 0.02;
-        f.strokeStyle = 'rgba(255,255,255,.08)'; f.stroke();
-        fgLayer = F.c;
-      }
-
-      // A name needs a ball of at least MINR to stay readable, and that caps
-      // how many can be in the drum at once — 1000 legible balls would need a
-      // container wider than the screen. So the drum holds as many as can be
-      // read and cycles which entrants are in it; the draw still covers all.
+      // ---------- balls ----------
+      // Radius follows the head count so every entrant fits. Numbers print
+      // while a ball is big enough to carry three digits; past that they are
+      // plain coloured balls, which is what a thousand-ball machine looks like.
       function sizeBalls() {
-        // 0.70 packs the drum so it reads as full: measured 70% of the
-        // glass covered and evenly spread (74/73/71/72/61% from centre out).
-        // At 0.42 it was 42% covered and visibly airy; past ~0.8 a churning
-        // mass starts to jam instead of flow.
-        var FILL = 0.70, MINR = 13.5;
-        var legible = Math.max(24, Math.floor(FILL * (R / MINR) * (R / MINR)));
-        var n = Math.min(pool.length || 1, legible, MAX_BALLS);
-        displayCap = Math.max(1, n);
-        BR = R * Math.sqrt(FILL / displayCap);
-        BR = Math.max(MINR, Math.min(BR, R * 0.125));
-        showLabels = true;
-        passes = displayCap <= 150 ? 3 : 4;
+        var n = Math.max(1, Math.min(pool.length || 1, MAX_BALLS));
+        var FILL = n <= 500 ? 0.70 : 0.55;   // a very big crowd needs room to flow
+        BR = R * Math.sqrt(FILL / n);
+        BR = Math.max(R * 0.018, Math.min(BR, R * 0.125));
+        showNums = BR >= 11;
+        passes = n <= 150 ? 3 : 4;
+        // the exit is one ball wide; drawn wider so it reads as a chute
+        gateBase = BR * 1.3;
+        gateHalf = gateBase;
+        chuteW = Math.max(BR * 2.8, S * 0.07);
       }
 
-      function prepareRound() {
-        sizeBalls();
-        display = [];
-        if (pool.length <= displayCap) {
-          for (var i = 0; i < pool.length; i++)
-            display.push({ n: pool[i].n, d: pool[i].d, idx: i });
-        } else {
-          // a uniform subset, then a uniform pick within it, is still a
-          // uniform draw over everyone
-          var taken = {}, got = 0;
-          while (got < displayCap) {
-            var r = Math.floor(Math.random() * pool.length);
-            if (taken[r]) continue;
-            taken[r] = 1; got++;
-            display.push({ n: pool[r].n, d: pool[r].d, idx: r });
-          }
-        }
-        spawnBalls();
-        updateCard();
-      }
-
-      // While the drum idles, keep swapping who is in it so a big roster all
-      // passes through. Never during a spin: the winner is read from display[].
-      function cycleBalls() {
-        if (phase !== 'idle') return;
-        if (pool.length <= display.length) return;
-        var used = {};
-        display.forEach(function (d) { used[d.idx] = 1; });
-        var swaps = Math.max(1, Math.round(display.length * 0.07));
-        for (var k = 0; k < swaps; k++) {
-          var slot = Math.floor(Math.random() * display.length);
-          var ni = -1;
-          for (var t = 0; t < 40; t++) {
-            var c = Math.floor(Math.random() * pool.length);
-            if (!used[c]) { ni = c; break; }
-          }
-          if (ni < 0) continue;
-          delete used[display[slot].idx];
-          used[ni] = 1;
-          display[slot] = { n: pool[ni].n, d: pool[ni].d, idx: ni };
-          var b = balls[slot];
-          if (b) {
-            b.label = pool[ni].n;
-            b.sprite = makeSprite(b.c1, b.c2, shortName(b.label), BR);
-            b.flash = performance.now();
-          }
-        }
-        updateCard();
-      }
-      setInterval(cycleBalls, 900);
-
-      // One gradient per ball per frame was costing ~4fps at a thousand
-       // balls, so each ball is baked into a small canvas once and blitted.
+      // One gradient per ball per frame was costing ~4fps at a thousand balls,
+      // so each look is baked into a small canvas once and blitted.
       function makeSprite(c1, c2, label, r) {
         var pad = 3, d = Math.ceil(r * 2) + pad * 2, mx = d / 2;
         var cn = document.createElement('canvas');
@@ -1244,7 +1153,7 @@
         if (label) {
           g.beginPath(); g.arc(mx, mx, r * 0.64, 0, 6.2832);
           g.fillStyle = 'rgba(255,255,255,.94)'; g.fill();
-          var fs = r * 0.46, guard = 0;
+          var fs = r * 0.52, guard = 0;
           g.textAlign = 'center'; g.textBaseline = 'middle';
           g.font = '700 ' + fs.toFixed(1) + 'px ' + FONT;
           while (g.measureText(label).width > r * 1.12 && fs > 5 && guard++ < 40) {
@@ -1257,42 +1166,41 @@
         return cn;
       }
 
-      function shortName(nm) {
-        return nm.length > 6 ? nm.slice(0, 6) : nm;
-      }
-
+      // Every entrant gets a ball. The entrant-to-position assignment is
+      // shuffled so an entrant's roster order carries no positional bias.
       function spawnBalls() {
         balls = [];
         ejected = null;
-        shared = PALETTE.map(function (c) {
-          return makeSprite(c[0], c[1], null, BR);
-        });
-        // start them on a spiral so a big crowd does not begin fully overlapped
-        var n = display.length;
-        display.forEach(function (e, i) {
-          var t = (i + 0.5) / n;
-          var a = i * 2.39996;                      // golden angle, even spread
+        shared = PALETTE.map(function (c) { return makeSprite(c[0], c[1], null, BR); });
+        var n = Math.min(pool.length, MAX_BALLS);
+        var order = [];
+        for (var i = 0; i < n; i++) order.push(i);
+        for (var k = n - 1; k > 0; k--) {
+          var j = Math.floor(Math.random() * (k + 1));
+          var tmp = order[k]; order[k] = order[j]; order[j] = tmp;
+        }
+        for (var p = 0; p < n; p++) {
+          var ent = pool[order[p]];
+          var t = (p + 0.5) / n;
+          var a = p * 2.39996;                        // golden angle, even spread
           var rad = Math.sqrt(t) * (R - BR * 1.6);
-          var c = PALETTE[i % PALETTE.length];
+          var c = PALETTE[p % PALETTE.length];
           balls.push({
             x: cx + Math.cos(a) * rad, y: cy + Math.sin(a) * rad,
             vx: (Math.random() - 0.5) * S * 0.4,
             vy: (Math.random() - 0.5) * S * 0.4,
-            r: BR, c1: c[0], c2: c[1], label: e.n, seg: i,
-            // labelled balls need their own sprite; a big unlabelled crowd
-            // shares one per colour
-            sprite: showLabels
-              ? makeSprite(c[0], c[1], shortName(e.n), BR)
-              : shared[i % PALETTE.length]
+            r: BR, c1: c[0], c2: c[1], ent: ent,
+            sprite: showNums ? makeSprite(c[0], c[1], String(ent.no), BR)
+                             : shared[p % PALETTE.length]
           });
-        });
+        }
       }
 
       // ---------- physics ----------
-      // Pair checks go through a uniform grid: a thousand balls brute-forced
-      // would be half a million tests per pass, which will not hold 60fps.
-      // Constraints are relaxed in passes with the wall enforced last —
-      // resolving overlap after a single wall pass pushes balls through glass.
+      // Pair checks go through a uniform grid; brute force at a thousand
+      // balls is half a million tests a pass. Constraints relax in passes
+      // with the wall enforced last, because resolving overlap after a
+      // single wall pass pushed balls through the glass.
       function buildGrid() {
         grid = {};
         cell = Math.max(6, BR * 2);
@@ -1316,7 +1224,7 @@
               if (!lst) continue;
               for (var m = 0; m < lst.length; m++) {
                 var j = lst[m];
-                if (j <= i) continue;              // each pair once
+                if (j <= i) continue;
                 var a2 = balls[j];
                 if (a2 === ejected) continue;
                 var ddx = a2.x - a1.x, ddy = a2.y - a1.y;
@@ -1339,11 +1247,18 @@
         }
       }
 
+      // The wall, with a gap at the bottom while the gate is open. A ball over
+      // the gap is simply not held in; once its centre has passed the rim it
+      // has left the drum, and that is the draw. Nothing here chooses.
       function clampWall() {
         for (var i = 0; i < balls.length; i++) {
           var q = balls[i];
           if (q === ejected) continue;
           var dx = q.x - cx, dy = q.y - cy;
+          if (gateOpen && dy > 0 && Math.abs(dx) <= gateHalf) {
+            if (dy >= R - q.r * 0.35) { capture(q); }
+            continue;
+          }
           var d = Math.sqrt(dx * dx + dy * dy) || 1;
           var lim = R - q.r;
           if (d > lim) {
@@ -1355,53 +1270,134 @@
         }
       }
 
-      function step(dt) {
+      function step(dt, now) {
         var mixing = (phase === 'mixing');
-        // The drum turns as a body rather than being pushed outward. A plain
-        // tangential force flung every ball against the glass and left the
-        // middle empty; steering each ball toward a rigid-rotation speed and
-        // supplying the matching centripetal pull holds its radius, so the
-        // spread they spawn with (uniform by area) is the spread they keep.
-        var OM = mixing ? 2.7 : 1.15;          // rad/s
-        var AG = mixing ? S * 7 : S * 1.5;     // jitter, keeps them mingling
-        var G = S * 0.05;                      // a hint of weight, no pile-up
-        var DAMP = mixing ? 0.999 : 0.998;
-        var VMAX = S * 2.2;                    // keeps a ball from tunnelling
+        var pouring = (phase === 'gate');
+        // idle/won: the drum turns as a body so the balls keep circling.
+        // mixing: no rotation, hard isotropic jitter, no gravity — a gas, so
+        //         positions decorrelate from wherever the balls started.
+        // gate:   gravity on, gentle jitter, no rotation — the balls pour
+        //         toward the opening and one falls through.
+        var OM = (mixing || pouring) ? 0 : 1.15;
+        var AG = mixing ? S * 9 : pouring ? S * 1.6 : S * 1.5;
+        var G  = mixing ? 0 : pouring ? S * 2.0 : S * 0.05;
+        var DAMP = mixing ? 0.996 : pouring ? 0.99 : 0.998;
+        var VMAX = S * 2.2;
 
         for (var i = 0; i < balls.length; i++) {
           var b = balls[i];
           if (b === ejected) continue;
           var ox = b.x - cx, oy = b.y - cy;
           var rr = Math.sqrt(ox * ox + oy * oy) || 0.001;
-          var tx = -oy / rr, ty = ox / rr;     // unit tangent
-
-          // steer the tangential speed toward omega * r
-          var vt = b.vx * tx + b.vy * ty;
-          var dvt = (OM * rr - vt) * Math.min(1, 7 * dt);
-          b.vx += tx * dvt; b.vy += ty * dvt;
-
-          // Centripetal term from the speed the ball actually has, not the
-          // speed it is aiming for. Using the target overshot, because the
-          // steering only closes part of the gap each frame, and the balls
-          // drifted inward and left a bare ring against the glass.
-          var vt2 = vt + dvt;
-          var cen = (vt2 * vt2 / rr) * dt;
-          b.vx -= (ox / rr) * cen; b.vy -= (oy / rr) * cen;
-
+          if (OM) {
+            var tx = -oy / rr, ty = ox / rr;
+            var vt = b.vx * tx + b.vy * ty;
+            var dvt = (OM * rr - vt) * Math.min(1, 7 * dt);
+            b.vx += tx * dvt; b.vy += ty * dvt;
+            var vt2 = vt + dvt;
+            var cen = (vt2 * vt2 / rr) * dt;
+            b.vx -= (ox / rr) * cen; b.vy -= (oy / rr) * cen;
+          }
           b.vy += G * dt;
           b.vx += (Math.random() - 0.5) * AG * dt;
           b.vy += (Math.random() - 0.5) * AG * dt;
-
           b.vx *= DAMP; b.vy *= DAMP;
           var sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
           if (sp > VMAX) { b.vx = b.vx / sp * VMAX; b.vy = b.vy / sp * VMAX; }
           b.x += b.vx * dt; b.y += b.vy * dt;
         }
 
+        // a hopper can arch over a narrow outlet; if nothing has come through
+        // in a while, widen the outlet. Still nothing chooses a ball.
+        if (pouring) {
+          var over = now - phaseStart - GATE_SLOW_MS;
+          gateHalf = over > 0 ? Math.min(gateBase * 2.2, gateBase * (1 + over / 2500)) : gateBase;
+        }
+
         for (var it = 0; it < passes; it++) { resolvePairs(); clampWall(); }
       }
 
       // ---------- drawing ----------
+      function layer() {
+        var c = document.createElement('canvas');
+        c.width = Math.round(S * DPR); c.height = Math.round(S * DPR);
+        var g = c.getContext('2d');
+        g.setTransform(DPR, 0, 0, DPR, 0, 0);
+        return { c: c, g: g };
+      }
+
+      function rr(g, x, y, w, h, r) {
+        g.beginPath();
+        g.moveTo(x + r, y);
+        g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r);
+        g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        g.lineTo(x + r, y + h); g.quadraticCurveTo(x, y + h, x, y + h - r);
+        g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y);
+        g.closePath();
+      }
+
+      // everything that never moves, drawn once into two layers; the rim is
+      // rebuilt with a gap when the gate opens
+      function buildChrome() {
+        var cwl = cx - chuteW / 2;
+        var B = layer(), g = B.g;
+        g.save();
+        g.shadowColor = 'rgba(3,11,26,.75)'; g.shadowBlur = S * 0.05;
+        g.shadowOffsetY = S * 0.016;
+        g.beginPath(); g.arc(cx, cy, R, 0, 6.2832);
+        g.fillStyle = 'rgba(8,24,52,.5)'; g.fill();
+        g.restore();
+        rr(g, cwl, gateY - R * 0.05, chuteW, trayY - gateY + R * 0.1, chuteW * 0.3);
+        g.fillStyle = 'rgba(12,34,70,.55)'; g.fill();
+        g.lineWidth = Math.max(1, S * 0.004);
+        g.strokeStyle = 'rgba(160,205,255,.32)'; g.stroke();
+        rr(g, cx - chuteW * 0.92, trayY - chuteW * 0.16, chuteW * 1.84,
+           chuteW * 0.52, chuteW * 0.22);
+        g.fillStyle = 'rgba(10,30,62,.7)'; g.fill();
+        g.strokeStyle = 'rgba(160,205,255,.3)'; g.stroke();
+        var bgg = g.createRadialGradient(cx - R * 0.3, cy - R * 0.35, R * 0.08, cx, cy, R);
+        bgg.addColorStop(0, 'rgba(130,185,255,.12)');
+        bgg.addColorStop(0.65, 'rgba(24,64,124,.16)');
+        bgg.addColorStop(1, 'rgba(6,20,45,.34)');
+        g.beginPath(); g.arc(cx, cy, R, 0, 6.2832);
+        g.fillStyle = bgg; g.fill();
+        bgLayer = B.c;
+
+        var F = layer(), f = F.g;
+        var gap = gateOpen ? Math.asin(Math.min(0.9, (chuteW / 2) / R)) : 0;
+        f.beginPath();
+        f.arc(cx, cy, R, Math.PI / 2 + gap, Math.PI / 2 - gap + Math.PI * 2);
+        f.lineWidth = R * 0.035;
+        f.strokeStyle = 'rgba(185,222,255,.5)';
+        f.shadowColor = 'rgba(60,140,255,.85)'; f.shadowBlur = R * 0.13;
+        f.stroke();
+        f.shadowBlur = 0;
+        if (gateOpen) {                              // lit posts either side
+          [-1, 1].forEach(function (sgn) {
+            var ax = cx + sgn * Math.sin(gap) * R, ay = cy + Math.cos(gap) * R;
+            f.beginPath(); f.arc(ax, ay, R * 0.028, 0, 6.2832);
+            f.fillStyle = '#FFE39A';
+            f.shadowColor = 'rgba(255,215,120,.95)'; f.shadowBlur = R * 0.08;
+            f.fill();
+          });
+          f.shadowBlur = 0;
+        }
+        f.beginPath();
+        f.arc(cx, cy, R * 0.9, Math.PI * 1.06, Math.PI * 1.48);
+        f.lineWidth = R * 0.055;
+        f.strokeStyle = 'rgba(255,255,255,.2)'; f.stroke();
+        f.beginPath(); f.arc(cx, cy, R * 0.965, 0, 6.2832);
+        f.lineWidth = R * 0.02;
+        f.strokeStyle = 'rgba(255,255,255,.08)'; f.stroke();
+        fgLayer = F.c;
+      }
+
+      function setGate(open) {
+        if (gateOpen === open) return;
+        gateOpen = open;
+        buildChrome();
+      }
+
       function drawBall(b, glow, scale) {
         var sp = b.sprite;
         if (!sp) return;
@@ -1412,18 +1408,9 @@
         }
         ctx.drawImage(sp, b.x - w / 2, b.y - w / 2, w, w);
         if (glow) ctx.shadowBlur = 0;
-        if (b.flash) {
-          var el = performance.now() - b.flash;
-          if (el < 260) {
-            ctx.globalAlpha = 0.5 * (1 - el / 260);
-            ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 1.06, 0, 6.2832);
-            ctx.fillStyle = '#fff'; ctx.fill();
-            ctx.globalAlpha = 1;
-          } else { b.flash = 0; }
-        }
       }
 
-      function render() {
+      function render(now) {
         ctx.clearRect(0, 0, S, S);
         if (bgLayer) ctx.drawImage(bgLayer, 0, 0, S, S);
 
@@ -1435,109 +1422,137 @@
         ctx.restore();
 
         if (fgLayer) ctx.drawImage(fgLayer, 0, 0, S, S);
-        if (ejected) drawBall(ejected, true, ejected.grow || 1);
 
-        // the gate lights up as a ball comes through, so it stays dynamic
-        var cwl = cx - chuteW / 2;
-        ctx.beginPath();
-        ctx.moveTo(cwl, gateY - R * 0.02);
-        ctx.lineTo(cx + chuteW / 2, gateY - R * 0.02);
-        ctx.lineWidth = Math.max(1, S * 0.006);
-        ctx.strokeStyle = phase === 'eject'
-          ? 'rgba(255,225,150,.9)' : 'rgba(160,205,255,.35)';
-        ctx.stroke();
+        if (ejected) {
+          // the drawn ball swells to a readable size on its way down
+          var k = Math.min(1, (now - ejected.since) / 450);
+          var from = ejected.r0 / ejected.r;
+          drawBall(ejected, true, from + (1 - from) * k);
+        }
       }
 
       // ---------- loop ----------
-      var last = 0, phaseStart = 0;
+      var last = 0;
       function frame(t) {
         if (!last) last = t;
-        // physics steps on a capped dt, but the phases run on the wall clock:
-        // accumulating capped dt stretched a 3.8s mix to ~29s on a slow frame
-        // rate, and the draw never finished
         var dt = Math.min((t - last) / 1000, 0.033);
         last = t;
 
-        if (phase === 'mixing') {
-          if (t - phaseStart >= MIX_MS) beginEject();
-        } else if (phase === 'eject' && ejected) {
-          var k = Math.min((t - phaseStart) / EJECT_MS, 1);
-          var e = k < 0.5
-            ? (k / 0.5) * 0.5                                  // drift to the gate
-            : 0.5 + Math.pow((k - 0.5) / 0.5, 1.7) * 0.5;      // then drop away
-          ejected.x = ejected.sx + (cx - ejected.sx) * Math.min(1, e * 2);
-          ejected.y = ejected.sy + (trayY - ejected.sy) * e;
-          ejected.grow = 1 + 0.35 * Math.min(1, k * 2);
-          if (k >= 1) finishDraw();
+        if (phase === 'mixing' && t - phaseStart >= MIX_MS) {
+          phase = 'gate'; phaseStart = t;
+          setGate(true);
+        } else if (phase === 'drop' && ejected) {
+          // free fall down the chute; it lands in the tray
+          ejected.vy += S * 2.6 * dt;
+          ejected.y += ejected.vy * dt;
+          ejected.x += (cx - ejected.x) * Math.min(1, 10 * dt);
+          if (ejected.y >= trayY) { ejected.y = trayY; ejected.vy = 0; finishDraw(); }
         }
 
-        step(dt);
-        render();
+        step(dt, t);
+        render(t);
         requestAnimationFrame(frame);
       }
 
       // ---------- draw lifecycle ----------
+      var roundTimer = null;
       function startDraw() {
-        if (phase === 'mixing' || phase === 'eject') return;
-        if (needsResample) resample();
-        if (!pool.length || !display.length) {
+        if (phase === 'mixing' || phase === 'gate' || phase === 'drop') return;
+        if (!pool.length || !balls.length) {
           winnerEl.innerHTML = '명단이 비었습니다 · 초기화를 눌러 주세요';
           return;
         }
-        phase = 'mixing'; phaseStart = performance.now();
-        pendingIdx = Math.floor(Math.random() * display.length);
-        spinBtn.disabled = true;
+        clearTimeout(roundTimer); roundTimer = null;
+        ejected = null;
+        // an entrant kept eligible after winning goes back in before the next round
+        if (balls.length !== Math.min(pool.length, MAX_BALLS)) spawnBalls();
         wrap.classList.remove('show-name');
+        phase = 'mixing'; phaseStart = performance.now();
+        spinBtn.disabled = true;
         wrap.classList.add('is-mixing');
-        winnerEl.innerHTML = '추첨 중…';
-        balls.forEach(function (b) {          // kick everything into motion
+        winnerEl.innerHTML = '섞는 중…';
+        balls.forEach(function (b) {
           b.vx += (Math.random() - 0.5) * S * 2.2;
           b.vy += (Math.random() - 0.5) * S * 2.2;
         });
       }
 
-      function beginEject() {
-        var b = balls[pendingIdx];
-        if (!b) { finishDraw(); return; }
+      // called from clampWall the moment a ball's centre clears the rim
+      function capture(b) {
+        setGate(false);
         ejected = b;
-        b.sx = b.x; b.sy = b.y;
-        // give the winning ball a readable face, whatever size it was inside
-        var er = Math.max(BR, S * 0.055);
-        b.sprite = makeSprite(b.c1, b.c2, shortName(b.label), er);
-        b.grow = 1;
-        b.targetGrow = 1;
-        b.r = er;
-        phase = 'eject'; phaseStart = performance.now();
+        phase = 'drop'; phaseStart = performance.now();
         wrap.classList.remove('is-mixing');
+        winnerEl.innerHTML = '배출 중…';
+        b.r0 = b.r;
+        b.r = Math.max(BR * 1.6, S * 0.055);
+        b.sprite = makeSprite(b.c1, b.c2, String(b.ent.no), b.r);
+        b.since = performance.now();
+        b.vy = Math.max(b.vy, S * 0.3);
       }
 
       function finishDraw() {
-        var won = display[pendingIdx];
+        var won = ejected ? ejected.ent : null;
         phase = 'won';
         spinBtn.disabled = false;
-        if (!won) { winnerEl.innerHTML = ''; needsResample = true; return; }
+        if (!won) { winnerEl.innerHTML = ''; return; }
+        var bi = balls.indexOf(ejected);
+        if (bi >= 0) balls.splice(bi, 1);         // it has physically left the drum
         wbName.textContent = won.n;
-        wbDept.textContent = won.d || '';
+        wbDept.textContent = 'No.' + won.no + (won.d ? ' · ' + won.d : '');
         wrap.classList.add('show-name');
         fireConfetti();
         winnerEl.innerHTML = '축하합니다';
-        winners.push({ n: won.n, d: won.d });
+        winners.push({ n: won.n, d: won.d, no: won.no });
         renderWinners(true);
-        if (removeChk.checked) pool.splice(won.idx, 1);
+        if (removeChk.checked) {
+          var pi = pool.indexOf(won);
+          if (pi >= 0) pool.splice(pi, 1);
+          markDrawn(won.no);
+        }
         updateCard();
-        needsResample = true;
-        roundTimer = setTimeout(resample, 1600);
+        // clear the tray after a while so the drum is clean for the next draw;
+        // a ball that stays eligible is put back when the tray clears
+        roundTimer = setTimeout(function () {
+          if (phase !== 'won') return;
+          ejected = null;
+          if (balls.length !== Math.min(pool.length, MAX_BALLS)) spawnBalls();
+        }, 6000);
       }
 
-      var needsResample = false, roundTimer = null;
-      function resample() {
-        clearTimeout(roundTimer); roundTimer = null;
-        phase = 'idle';
-        prepareRound();
-        needsResample = false;
+      // ---------- roster board (left column) ----------
+      function renderBoard() {
+        if (!boardEl || !boardList) return;
+        boardList.innerHTML = '';
+        boardEl.classList.remove('scroll');
+        boardList.style.removeProperty('--dur');
+        var frag = document.createDocumentFragment();
+        basePool.forEach(function (e) {
+          var li = document.createElement('li');
+          li.setAttribute('data-no', e.no);
+          li.innerHTML = '<span class="no">' + e.no + '</span><span class="nm"></span>' +
+                         (e.d ? '<span class="d"></span>' : '');
+          li.querySelector('.nm').textContent = e.n;
+          if (e.d) li.querySelector('.d').textContent = e.d;
+          frag.appendChild(li);
+        });
+        boardList.appendChild(frag);
+        // loop the list when it overflows the box
+        if (boardList.scrollHeight > boardEl.clientHeight + 4) {
+          var rows = basePool.length;
+          boardList.innerHTML += boardList.innerHTML;
+          boardList.style.setProperty('--dur', Math.max(20, rows * 0.13).toFixed(1) + 's');
+          boardEl.classList.add('scroll');
+        }
       }
 
-      // ---------- winners ----------
+      function markDrawn(no) {
+        if (!boardList) return;
+        var rows = boardList.querySelectorAll('li[data-no="' + no + '"]');
+        for (var i = 0; i < rows.length; i++) rows[i].classList.add('drawn');
+      }
+
+      // ---------- winners list ----------
       function renderWinners(teleportLast) {
         countEl.textContent = winners.length;
         listEl.innerHTML = '';
@@ -1559,11 +1574,10 @@
           var nm = document.createElement('span');
           nm.className = 'w-name'; nm.textContent = w.n;
           tw.appendChild(nm);
-          if (w.d) {
-            var dp = document.createElement('span');
-            dp.className = 'w-dept'; dp.textContent = w.d;
-            tw.appendChild(dp);
-          }
+          var dp = document.createElement('span');
+          dp.className = 'w-dept';
+          dp.textContent = 'No.' + w.no + (w.d ? ' · ' + w.d : '');
+          tw.appendChild(dp);
           li.appendChild(tw);
           listEl.appendChild(li);
         });
@@ -1575,9 +1589,7 @@
         if (rcRemain) rcRemain.textContent = left;
         if (rcTotal) rcTotal.textContent = total;
         if (rcBar) rcBar.style.width = total ? (drawn / total * 100).toFixed(1) + '%' : '0%';
-        if (rcMeta) rcMeta.textContent = '추첨 ' + drawn + '명 완료' +
-          (display.length && left > display.length
-            ? ' · 통에 ' + display.length + '명 순환' : '');
+        if (rcMeta) rcMeta.textContent = '통 안 ' + balls.length + '구 · 추첨 ' + drawn + '명 완료';
         if (rcDept) {
           var seen = {}, n = 0;
           basePool.forEach(function (e) {
@@ -1624,16 +1636,21 @@
       // ---------- reset / roster ----------
       function restore(list) {
         clearTimeout(roundTimer); roundTimer = null;
-        phase = 'idle'; ejected = null;
+        phase = 'idle'; ejected = null; setGate(false);
         spinBtn.disabled = false;
         wrap.classList.remove('is-mixing');
         wrap.classList.remove('show-name');
         winners = [];
         if (list) basePool = list;
+        // numbers are fixed for the whole event, even as winners leave
+        basePool.forEach(function (e, i) { e.no = i + 1; });
         pool = basePool.slice();
-        prepareRound();
-        needsResample = false;
+        sizeBalls();
+        buildChrome();
+        spawnBalls();
+        renderBoard();
         renderWinners();
+        updateCard();
       }
 
       function loadRoster(text, redetect) {
@@ -1721,7 +1738,7 @@
       var rt = null;
       window.addEventListener('resize', function () {
         clearTimeout(rt);
-        rt = setTimeout(function () { layout(); spawnBalls(); }, 150);
+        rt = setTimeout(function () { layout(); spawnBalls(); renderBoard(); }, 150);
       });
 
       // ---------- init ----------
@@ -1737,11 +1754,15 @@
         }
       } catch (err) {}
       namesBox.value = seedText;
-      layout();
       var seeded = loadRoster(seedText, false);
-      if (seeded.length >= 2) { basePool = seeded; pool = basePool.slice(); }
-      prepareRound();
+      if (seeded.length >= 2) basePool = seeded;
+      basePool.forEach(function (e, i) { e.no = i + 1; });
+      pool = basePool.slice();
+      layout();
+      spawnBalls();
+      renderBoard();
       renderWinners();
+      updateCard();
       requestAnimationFrame(frame);
     })();
 
