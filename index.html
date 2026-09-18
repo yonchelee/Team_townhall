@@ -1296,7 +1296,7 @@
         if (pouring) JET *= 1.25;
         // with the port open, air escapes through it and carries whatever is
         // circulating nearby toward the mouth. Label-blind, like everything here.
-        var px = Math.cos(PORT), py = Math.sin(PORT), SUCK_R = R * 0.45;
+        var px = Math.cos(PORT), py = Math.sin(PORT), SUCK_R = R * 0.3;
 
         for (var i = 0; i < balls.length; i++) {
           var b = balls[i];
@@ -1324,7 +1324,7 @@
               var qx = ox - px * R, qy = oy - py * R;
               var qd = Math.sqrt(qx * qx + qy * qy) || 1;
               if (qd < SUCK_R) {
-                var pull = S * 4 * (1 - qd / SUCK_R) / qd;
+                var pull = S * 3 * (1 - qd / SUCK_R) / qd;
                 b.vx -= qx * pull * dt; b.vy -= qy * pull * dt;
               }
             }
@@ -1397,7 +1397,7 @@
         g.beginPath(); g.arc(cx, cy, Rt + tubeW * 0.28, PORT, TUBE_END);
         g.lineWidth = tubeW * 0.14; g.strokeStyle = 'rgba(255,255,255,.07)'; g.stroke();
         // the tray at the tube's end, where the drawn ball comes to rest
-        rr(g, cx - tubeW * 0.95, trayY - tubeW * 0.3, tubeW * 1.9, tubeW * 0.72, tubeW * 0.25);
+        rr(g, cx - tubeW * 0.95, trayY - tubeW * 0.25, tubeW * 1.9, tubeW * 0.9, tubeW * 0.25);
         g.fillStyle = 'rgba(10,30,62,.8)'; g.fill();
         g.lineWidth = edge; g.strokeStyle = 'rgba(160,205,255,.3)'; g.stroke();
         var bgg = g.createRadialGradient(cx - R * 0.3, cy - R * 0.35, R * 0.08, cx, cy, R);
@@ -1483,6 +1483,20 @@
 
         if (fgLayer) ctx.drawImage(fgLayer, 0, 0, S, S);
 
+        if (gateOpen) {
+          // streaks of escaping air through the open passage
+          var spx = Math.cos(PORT), spy = Math.sin(PORT);
+          var a0 = R * 0.86, a1 = Rt + tubeW * 0.15, len = chuteW * 0.28;
+          ctx.lineWidth = Math.max(1, S * 0.003); ctx.lineCap = 'round';
+          for (var k = 0; k < 5; k++) {
+            var ph = ((now / 420) + k * 0.2) % 1;
+            var al = a0 + ph * (a1 - a0), ac = (k - 2) * chuteW * 0.17;
+            var sx = cx + spx * al - spy * ac, sy = cy + spy * al + spx * ac;
+            ctx.strokeStyle = 'rgba(255,236,170,' + (0.55 * (1 - ph)).toFixed(2) + ')';
+            ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + spx * len, sy + spy * len); ctx.stroke();
+          }
+        }
+
         if (ejected) {
           // the drawn ball swells to a readable size on its way down
           var k = Math.min(1, (now - ejected.since) / 450);
@@ -1502,41 +1516,80 @@
           phase = 'gate'; phaseStart = t;
           setGate(true);
         } else if (phase === 'drop' && ejected) {
-          var e = ejected, ppx = Math.cos(PORT), ppy = Math.sin(PORT);
-          if (e.stage === 0) {
-            // through the passage on its own momentum plus the escaping air,
-            // easing onto the passage's axis as the walls guide it
-            var eox = e.x - cx, eoy = e.y - cy;
-            var along = eox * ppx + eoy * ppy, across = eoy * ppx - eox * ppy;
-            var va = Math.max(e.vx * ppx + e.vy * ppy, S * 0.35) + S * 2.5 * dt;
-            across *= Math.max(0, 1 - 8 * dt);
-            along += va * dt;
-            e.vx = ppx * va; e.vy = ppy * va;
-            e.x = cx + ppx * along - ppy * across; e.y = cy + ppy * along + ppx * across;
-            if (along >= Rt) {
-              e.stage = 1; e.th = PORT; e.om = Math.max(0.35, va / Rt * 0.5);
-              // a tiny ball grows to a size the tube can show
-              var tr = Math.max(e.r, Math.min(tubeW * 0.42, S * 0.03));
-              if (tr > e.r) {
-                e.r0 = e.r; e.r = tr;
-                e.sprite = makeSprite(e.c1, e.c2, String(e.ent.no), e.r);
-                e.since = t;
-              }
-            }
-          } else {
-            // rolls round the tube under gravity and stops in the tray
-            e.om += (S * 2.6 / Rt) * Math.cos(e.th) * dt;
-            e.om = Math.min(e.om * 0.995, 2.8);
-            e.th += e.om * dt;
-            if (e.th >= TUBE_END) { e.th = TUBE_END; }
-            e.x = cx + Math.cos(e.th) * Rt; e.y = cy + Math.sin(e.th) * Rt;
-            if (e.th >= TUBE_END) finishDraw();
-          }
+          rideOut(ejected, dt, t);
         }
 
         step(dt, t);
         render(t);
         requestAnimationFrame(frame);
+      }
+
+      // The drawn ball is a free body from the moment it leaves the drum:
+      // gravity, the escaping air while it is in the passage, and the walls
+      // of the passage, the tube and the tray. Nothing scripts its path, so
+      // it bounces and settles the way a ball in a glass tube does.
+      function rideOut(e, dt, now) {
+        var ppx = Math.cos(PORT), ppy = Math.sin(PORT);
+        var Gd = S * 2.4;
+        var inner = Rt - tubeW / 2, outer = Rt + tubeW / 2;
+        if (e.stage === 0) {
+          // passage: pushed out by the air, kept on the axis by the walls
+          e.vx += ppx * S * 4.5 * dt; e.vy += ppy * S * 4.5 * dt + Gd * dt;
+          e.x += e.vx * dt; e.y += e.vy * dt;
+          var ox = e.x - cx, oy = e.y - cy;
+          var along = ox * ppx + oy * ppy, across = oy * ppx - ox * ppy;
+          var lim = Math.max(0, chuteW / 2 - e.r * 0.9);
+          if (Math.abs(across) > lim) {
+            var sgn = across > 0 ? 1 : -1;
+            var vAlong = e.vx * ppx + e.vy * ppy, vAcross = e.vy * ppx - e.vx * ppy;
+            if (vAcross * sgn > 0) vAcross *= -0.3;
+            across = sgn * lim;
+            e.vx = ppx * vAlong - ppy * vAcross; e.vy = ppy * vAlong + ppx * vAcross;
+            e.x = cx + ppx * along - ppy * across; e.y = cy + ppy * along + ppx * across;
+          }
+          if (along >= inner + e.r) {
+            e.stage = 1;
+            // a tiny ball grows to a size the tube can show
+            var tr = Math.max(e.r, Math.min(tubeW * 0.42, S * 0.03));
+            if (tr > e.r) {
+              e.r0 = e.r; e.r = tr;
+              e.sprite = makeSprite(e.c1, e.c2, String(e.ent.no), e.r);
+              e.since = now;
+            }
+          }
+        } else if (e.stage === 1) {
+          // tube: gravity does the work; the two curved walls hold it in
+          e.vy += Gd * dt;
+          e.x += e.vx * dt; e.y += e.vy * dt;
+          var tx = e.x - cx, ty = e.y - cy;
+          var d = Math.sqrt(tx * tx + ty * ty) || 1, nx = tx / d, ny = ty / d;
+          var lo = inner + e.r, hi = outer - e.r;
+          if (d < lo || d > hi) {
+            var onInner = d < lo, tgt = onInner ? lo : hi;
+            e.x = cx + nx * tgt; e.y = cy + ny * tgt; d = tgt;
+            var vn = e.vx * nx + e.vy * ny;
+            if ((onInner && vn < 0) || (!onInner && vn > 0)) { e.vx -= 1.35 * vn * nx; e.vy -= 1.35 * vn * ny; }
+            e.vx *= 0.995; e.vy *= 0.995;               // rolling friction
+          }
+          var th = Math.atan2(e.y - cy, e.x - cx);
+          if (th < PORT) {                              // the tube is capped at the port
+            var vt = -e.vx * ny + e.vy * nx;            // clockwise component
+            if (vt < 0) { e.vx += 1.3 * vt * ny; e.vy -= 1.3 * vt * nx; }
+            e.x = cx + Math.cos(PORT) * d; e.y = cy + Math.sin(PORT) * d;
+          }
+          if (th >= TUBE_END && e.y > cy) { e.stage = 2; e.trayAt = now; }
+        } else {
+          // tray: a cup with a floor level with the tube's outer wall
+          e.vy += Gd * dt;
+          e.x += e.vx * dt; e.y += e.vy * dt;
+          var floor = cy + outer - e.r;
+          if (e.y > floor) { e.y = floor; if (e.vy > 0) e.vy *= -0.3; e.vx *= 0.9; }
+          var wl = cx - tubeW * 0.95 + e.r, wr = cx + tubeW * 0.95 - e.r;
+          if (e.x < wl) { e.x = wl; if (e.vx < 0) e.vx *= -0.4; }
+          if (e.x > wr) { e.x = wr; if (e.vx > 0) e.vx *= -0.4; }
+          var settled = Math.abs(e.vx) + Math.abs(e.vy) < S * 0.03 && e.y >= floor - 0.5;
+          if (settled || now - e.trayAt > 2500) { e.vx = 0; e.vy = 0; finishDraw(); }
+        }
       }
 
       // ---------- draw lifecycle ----------
