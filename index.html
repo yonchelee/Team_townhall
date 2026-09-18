@@ -293,7 +293,8 @@
     flex-direction:column; align-items:center; gap:1.3vh; }
   .drum-wrap { position:relative; width:100%; aspect-ratio:1; }
   .drum-wrap canvas { width:100%; height:100%; display:block; }
-  .drum-glow { position:absolute; inset:-9%; border-radius:50%; pointer-events:none;
+  /* the glow hugs the drum, which sits high-left of centre to leave room for the tube */
+  .drum-glow { position:absolute; inset:5.5% 10.5% 15.5%; border-radius:50%; pointer-events:none;
     background:radial-gradient(circle, rgba(70,150,255,.34) 0%,
       rgba(70,150,255,.12) 46%, transparent 70%);
     filter:blur(20px); opacity:.6;
@@ -301,7 +302,7 @@
   .drum-wrap.is-mixing .drum-glow { opacity:1; transform:scale(1.07); }
   /* the winner's name, ~5x the old size, laid over the dial so the dial
      itself keeps its full size */
-  .winner-big { position:absolute; left:50%; top:50%; z-index:4;
+  .winner-big { position:absolute; left:50%; top:45%; z-index:4;
     transform:translate(-50%,-50%) scale(.55);
     font-size:clamp(62px,9vw,170px); font-weight:800; line-height:1;
     letter-spacing:.01em; color:#fff; white-space:nowrap; text-align:center;
@@ -973,7 +974,7 @@
       var STORE = 'luckydraw.roster';
       var FONT = '"SamsungOneKoreanOTF","Malgun Gothic","Apple SD Gothic Neo",sans-serif';
       var MIX_MS = 4000;                  // turbulent mixing before the gate opens
-      var GATE_SLOW_MS = 6000;            // past this, widen the gate so a jam clears
+      var GATE_SLOW_MS = 3500;            // past this, widen the port so a slow round ends
 
       var basePool = [
         { n: '참가자 1', d: '기구개발팀' }, { n: '참가자 2', d: '기구개발팀' },
@@ -987,8 +988,13 @@
       var phase = 'idle';                 // idle | blow | mixing | gate | drop | won
       var mixBtn = document.getElementById('mixBtn');
       var phaseStart = 0, gateOpen = false, ejected = null;
-      var S = 0, cx = 0, cy = 0, R = 0, BR = 0, gateY = 0, trayY = 0;
+      var S = 0, cx = 0, cy = 0, R = 0, BR = 0, trayY = 0;
       var chuteW = 0, gateHalf = 0, gateBase = 0;
+      // The exit port sits high on the rim, where the blower delivers the
+      // balls; a tube runs from it round the outside of the drum down to the
+      // tray. PORT is the port's angle, Rt the tube's centre-line radius.
+      var PORT = -72 * Math.PI / 180, TUBE_END = Math.PI / 2;
+      var Rt = 0, tubeW = 0;
       var showNums = true, passes = 3, grid = {}, cell = 0;
       var shared = [], bgLayer = null, fgLayer = null, DPR = 1;
 
@@ -1006,9 +1012,10 @@
         cv.width = Math.round(S * dpr);
         cv.height = Math.round(S * dpr);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        cx = S / 2; cy = S * 0.415; R = S * 0.415;
-        gateY = cy + R;
-        trayY = S * 0.93;
+        cx = S / 2; cy = S * 0.45; R = S * 0.355;
+        tubeW = S * 0.085;
+        Rt = R + S * 0.012 + tubeW / 2;
+        trayY = cy + Rt;
         sizeBalls();
         buildChrome();
       }
@@ -1119,10 +1126,11 @@
         BR = Math.max(R * 0.018, Math.min(BR, R * 0.125));
         showNums = true;
         passes = n <= 150 ? 3 : 4;
-        // the exit is one ball wide; drawn wider so it reads as a chute
-        gateBase = BR * 1.3;
+        // the port is one ball wide; drawn wider so it reads as a doorway.
+        // A handful of balls hits a tight port rarely, so it opens wider.
+        gateBase = BR * (n <= 40 ? 1.7 : 1.3);
         gateHalf = gateBase;
-        chuteW = Math.max(BR * 2.8, S * 0.07);
+        chuteW = Math.max(BR * 2.8, S * 0.06);
       }
 
       // One gradient per ball per frame was costing ~4fps at a thousand balls,
@@ -1241,16 +1249,18 @@
         }
       }
 
-      // The wall, with a gap at the bottom while the gate is open. A ball over
+      // The wall, with a gap at the port while the gate is open. A ball over
       // the gap is simply not held in; once its centre has passed the rim it
       // has left the drum, and that is the draw. Nothing here chooses.
       function clampWall() {
+        var px = Math.cos(PORT), py = Math.sin(PORT);
         for (var i = 0; i < balls.length; i++) {
           var q = balls[i];
           if (q === ejected) continue;
           var dx = q.x - cx, dy = q.y - cy;
-          if (gateOpen && dy > 0 && Math.abs(dx) <= gateHalf) {
-            if (dy >= R - q.r * 0.35) { capture(q); }
+          var along = dx * px + dy * py, across = dy * px - dx * py;
+          if (gateOpen && along > 0 && Math.abs(across) <= gateHalf) {
+            if (along >= R - q.r * 0.35) { capture(q); }
             continue;
           }
           var d = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -1266,23 +1276,23 @@
 
       function step(dt, now) {
         var mixing = (phase === 'mixing');
-        var blowing = mixing || (phase === 'blow');
         var pouring = (phase === 'gate');
+        var blowing = mixing || pouring || (phase === 'blow');
         // idle/won: the drum turns as a body so the balls keep circling.
-        // blow/mixing: gravity on and an air jet from the floor — balls over
-        //         the nozzle are lifted up the middle, spill outward at the
-        //         top and slide back down the sides into the jet. The floor
-        //         is coned so the pile keeps feeding the nozzle. The draw's
-        //         own mixing adds harder jitter on top of the same jet.
-        // gate:   gravity on, gentle jitter, no rotation — the balls pour
-        //         toward the opening and one falls through.
-        var OM = (blowing || pouring) ? 0 : 1.15;
-        var AG = mixing ? S * 5 : blowing ? S * 2.5 : pouring ? S * 1.6 : S * 1.5;
-        var G  = blowing ? S * 2.4 : pouring ? S * 2.0 : S * 0.05;
-        var DAMP = blowing ? 0.992 : pouring ? 0.99 : 0.998;
+        // blow/mixing/gate: gravity on and an air jet from the floor — balls
+        //         over the nozzle are lifted up the middle, spill outward at
+        //         the top and slide back down the sides into the jet. The
+        //         floor is coned so the pile keeps feeding the nozzle. The
+        //         draw's mixing adds harder jitter; when the port opens the
+        //         fan steps up and the plume carries a ball into it.
+        var OM = blowing ? 0 : 1.15;
+        var AG = mixing ? S * 5 : blowing ? S * 2.5 : S * 1.5;
+        var G  = blowing ? S * 2.4 : S * 0.05;
+        var DAMP = blowing ? 0.992 : 0.998;
         var VMAX = S * 2.2;
         // the blower pulses like a real fan, so the plume breathes
         var JET = S * 7 * (0.9 + 0.25 * Math.sin(now * 0.009) + 0.12 * Math.sin(now * 0.023));
+        if (pouring) JET *= 1.25;
 
         for (var i = 0; i < balls.length; i++) {
           var b = balls[i];
@@ -1348,22 +1358,36 @@
       // everything that never moves, drawn once into two layers; the rim is
       // rebuilt with a gap when the gate opens
       function buildChrome() {
-        var cwl = cx - chuteW / 2;
         var B = layer(), g = B.g;
+        var edge = Math.max(1, S * 0.004);
         g.save();
         g.shadowColor = 'rgba(3,11,26,.75)'; g.shadowBlur = S * 0.05;
         g.shadowOffsetY = S * 0.016;
         g.beginPath(); g.arc(cx, cy, R, 0, 6.2832);
         g.fillStyle = 'rgba(8,24,52,.5)'; g.fill();
         g.restore();
-        rr(g, cwl, gateY - R * 0.05, chuteW, trayY - gateY + R * 0.1, chuteW * 0.3);
-        g.fillStyle = 'rgba(12,34,70,.55)'; g.fill();
-        g.lineWidth = Math.max(1, S * 0.004);
-        g.strokeStyle = 'rgba(160,205,255,.32)'; g.stroke();
-        rr(g, cx - chuteW * 0.92, trayY - chuteW * 0.16, chuteW * 1.84,
-           chuteW * 0.52, chuteW * 0.22);
-        g.fillStyle = 'rgba(10,30,62,.7)'; g.fill();
-        g.strokeStyle = 'rgba(160,205,255,.3)'; g.stroke();
+        // the port: a short radial passage from the rim out to the tube
+        g.save();
+        g.translate(cx, cy); g.rotate(PORT);
+        g.beginPath(); g.rect(R * 0.97, -chuteW / 2, Rt - R * 0.97, chuteW);
+        g.fillStyle = 'rgba(90,150,230,.14)'; g.fill();
+        g.lineWidth = edge; g.strokeStyle = 'rgba(175,215,255,.5)';
+        g.beginPath(); g.moveTo(R, -chuteW / 2); g.lineTo(Rt, -chuteW / 2); g.stroke();
+        g.beginPath(); g.moveTo(R, chuteW / 2); g.lineTo(Rt, chuteW / 2); g.stroke();
+        g.restore();
+        // the tube: round the outside of the drum from the port to the tray
+        g.beginPath(); g.arc(cx, cy, Rt, PORT, TUBE_END);
+        g.lineWidth = tubeW; g.lineCap = 'butt';
+        g.strokeStyle = 'rgba(90,150,230,.14)'; g.stroke();
+        g.lineWidth = Math.max(1.2, S * 0.005); g.strokeStyle = 'rgba(175,215,255,.5)';
+        g.beginPath(); g.arc(cx, cy, Rt - tubeW / 2, PORT, TUBE_END); g.stroke();
+        g.beginPath(); g.arc(cx, cy, Rt + tubeW / 2, PORT, TUBE_END); g.stroke();
+        g.beginPath(); g.arc(cx, cy, Rt + tubeW * 0.28, PORT, TUBE_END);
+        g.lineWidth = tubeW * 0.14; g.strokeStyle = 'rgba(255,255,255,.07)'; g.stroke();
+        // the tray at the tube's end, where the drawn ball comes to rest
+        rr(g, cx - tubeW * 0.95, trayY - tubeW * 0.3, tubeW * 1.9, tubeW * 0.72, tubeW * 0.25);
+        g.fillStyle = 'rgba(10,30,62,.8)'; g.fill();
+        g.lineWidth = edge; g.strokeStyle = 'rgba(160,205,255,.3)'; g.stroke();
         var bgg = g.createRadialGradient(cx - R * 0.3, cy - R * 0.35, R * 0.08, cx, cy, R);
         bgg.addColorStop(0, 'rgba(130,185,255,.12)');
         bgg.addColorStop(0.65, 'rgba(24,64,124,.16)');
@@ -1373,9 +1397,10 @@
         bgLayer = B.c;
 
         var F = layer(), f = F.g;
-        var gap = gateOpen ? Math.asin(Math.min(0.9, (chuteW / 2) / R)) : 0;
+        var door = Math.asin(Math.min(0.9, (chuteW / 2) / R));
+        var gap = gateOpen ? door : 0;
         f.beginPath();
-        f.arc(cx, cy, R, Math.PI / 2 + gap, Math.PI / 2 - gap + Math.PI * 2);
+        f.arc(cx, cy, R, PORT + gap, PORT - gap + Math.PI * 2);
         f.lineWidth = R * 0.035;
         f.strokeStyle = 'rgba(185,222,255,.5)';
         f.shadowColor = 'rgba(60,140,255,.85)'; f.shadowBlur = R * 0.13;
@@ -1383,13 +1408,27 @@
         f.shadowBlur = 0;
         if (gateOpen) {                              // lit posts either side
           [-1, 1].forEach(function (sgn) {
-            var ax = cx + sgn * Math.sin(gap) * R, ay = cy + Math.cos(gap) * R;
+            var a = PORT + sgn * door;
+            var ax = cx + Math.cos(a) * R, ay = cy + Math.sin(a) * R;
             f.beginPath(); f.arc(ax, ay, R * 0.028, 0, 6.2832);
             f.fillStyle = '#FFE39A';
             f.shadowColor = 'rgba(255,215,120,.95)'; f.shadowBlur = R * 0.08;
             f.fill();
           });
           f.shadowBlur = 0;
+          // and the passage lights up so the eye follows the ball out
+          f.save();
+          f.translate(cx, cy); f.rotate(PORT);
+          f.lineWidth = Math.max(1, S * 0.004); f.strokeStyle = 'rgba(255,227,154,.7)';
+          f.shadowColor = 'rgba(255,215,120,.8)'; f.shadowBlur = R * 0.05;
+          f.beginPath(); f.moveTo(R, -chuteW / 2); f.lineTo(Rt, -chuteW / 2); f.stroke();
+          f.beginPath(); f.moveTo(R, chuteW / 2); f.lineTo(Rt, chuteW / 2); f.stroke();
+          f.restore();
+        } else {                                     // the closed door, marked in amber
+          f.beginPath();
+          f.arc(cx, cy, R, PORT - door, PORT + door);
+          f.lineWidth = R * 0.035;
+          f.strokeStyle = 'rgba(255,227,154,.5)'; f.stroke();
         }
         f.beginPath();
         f.arc(cx, cy, R * 0.9, Math.PI * 1.06, Math.PI * 1.48);
@@ -1451,11 +1490,22 @@
           phase = 'gate'; phaseStart = t;
           setGate(true);
         } else if (phase === 'drop' && ejected) {
-          // free fall down the chute; it lands in the tray
-          ejected.vy += S * 2.6 * dt;
-          ejected.y += ejected.vy * dt;
-          ejected.x += (cx - ejected.x) * Math.min(1, 10 * dt);
-          if (ejected.y >= trayY) { ejected.y = trayY; ejected.vy = 0; finishDraw(); }
+          var e = ejected;
+          if (e.stage === 0) {
+            // out through the port into the tube
+            e.t += dt / 0.3;
+            var k = Math.min(1, e.t), rad = R + (Rt - R) * k;
+            e.x = cx + Math.cos(PORT) * rad; e.y = cy + Math.sin(PORT) * rad;
+            if (k >= 1) { e.stage = 1; e.th = PORT; e.om = 0.5; }
+          } else {
+            // rolls round the tube under gravity and stops in the tray
+            e.om += (S * 2.6 / Rt) * Math.cos(e.th) * dt;
+            e.om = Math.min(e.om * 0.995, 2.8);
+            e.th += e.om * dt;
+            if (e.th >= TUBE_END) { e.th = TUBE_END; }
+            e.x = cx + Math.cos(e.th) * Rt; e.y = cy + Math.sin(e.th) * Rt;
+            if (e.th >= TUBE_END) finishDraw();
+          }
         }
 
         step(dt, t);
@@ -1507,10 +1557,12 @@
         wrap.classList.remove('is-mixing');
         winnerEl.innerHTML = '배출 중…';
         b.r0 = b.r;
-        b.r = Math.max(BR * 1.6, S * 0.055);
+        b.r = Math.min(tubeW * 0.4, Math.max(BR * 1.5, S * 0.03));
         b.sprite = makeSprite(b.c1, b.c2, String(b.ent.no), b.r);
         b.since = performance.now();
-        b.vy = Math.max(b.vy, S * 0.3);
+        b.stage = 0; b.t = 0;
+        b.x = cx + Math.cos(PORT) * R; b.y = cy + Math.sin(PORT) * R;
+        b.vx = 0; b.vy = 0;
       }
 
       function finishDraw() {
@@ -1521,6 +1573,11 @@
         if (!won) { winnerEl.innerHTML = ''; return; }
         var bi = balls.indexOf(ejected);
         if (bi >= 0) balls.splice(bi, 1);         // it has physically left the drum
+        // in the tray it swells once more, to a size the room can read
+        ejected.r0 = ejected.r;
+        ejected.r = Math.max(ejected.r, S * 0.05);
+        ejected.sprite = makeSprite(ejected.c1, ejected.c2, String(won.no), ejected.r);
+        ejected.since = performance.now();
         wbName.textContent = won.n;
         wbDept.textContent = 'No.' + won.no + (won.d ? ' · ' + won.d : '');
         wrap.classList.add('show-name');
