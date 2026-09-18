@@ -501,6 +501,39 @@
     background:linear-gradient(90deg,var(--deep-blue),var(--bright-blue));
     box-shadow:0 0 12px 1px var(--accent-glow); transition:width .5s ease; }
 
+  /* ===== Presenter remote ===== */
+  .remote-btn { position:fixed; right:18px; bottom:22px; z-index:130;
+    padding:8px 14px; border-radius:999px; cursor:pointer;
+    font-size:12px; letter-spacing:.06em; color:rgba(220,236,255,.7);
+    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.18);
+    transition:opacity .3s ease, background .25s ease; }
+  .remote-btn:hover { background:rgba(30,111,208,.3); color:#fff; }
+  body.remote-on .controls, body.remote-on .remote-btn { opacity:0; pointer-events:none; }
+  .controls { transition:opacity .4s ease; }
+  html.remote-mode body > :not(.remote-ui) { display:none !important; }
+  html.remote-mode body { overflow:auto; background:#02070F; }
+  .remote-ui { position:fixed; inset:0; display:flex; flex-direction:column;
+    padding:16px; gap:12px; color:#fff; background:linear-gradient(180deg,#041229,#02070F); }
+  .remote-head { display:flex; justify-content:space-between; align-items:baseline;
+    font-size:13px; letter-spacing:.14em; color:rgba(190,215,255,.7); }
+  .remote-head b { font-size:18px; color:#fff; letter-spacing:0; }
+  .remote-big { display:flex; gap:10px; }
+  .remote-big button { flex:1 1 0; padding:20px 0; border-radius:16px; cursor:pointer;
+    font-size:20px; font-weight:700; color:#fff;
+    background:rgba(30,111,208,.32); border:1px solid rgba(30,111,208,.75); }
+  .remote-big button:active { background:rgba(30,111,208,.6); }
+  .remote-list { list-style:none; margin:0; padding:0; overflow-y:auto; flex:1 1 auto;
+    display:flex; flex-direction:column; gap:6px; }
+  .remote-list button { width:100%; text-align:left; padding:11px 14px; border-radius:12px;
+    cursor:pointer; font-size:15px; color:rgba(232,242,255,.92);
+    background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); }
+  .remote-list .sub button { padding-left:30px; font-size:13px; color:rgba(190,215,255,.75); }
+  .remote-list .cur button { background:rgba(30,111,208,.35); border-color:rgba(127,216,232,.8);
+    color:#fff; box-shadow:0 0 18px 1px rgba(30,136,255,.35); }
+  .remote-list button .n { display:inline-block; width:2em; color:rgba(255,227,154,.85); font-weight:700; }
+  .remote-hint { font-size:11px; color:rgba(190,215,255,.5); line-height:1.5; }
+  .remote-hint.warn { color:#FFB3C7; }
+
   /* ===== Dot navigation ===== */
   /* prev + dots + next share one bar pinned to the bottom */
   .controls { position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
@@ -563,6 +596,7 @@
 <body>
   <!-- Progress + dot nav -->
   <div class="progress" id="progress"></div>
+  <button class="remote-btn" id="remoteBtn" title="리모컨 창 열기 (R)">&#9654; 리모컨</button>
   <div class="controls">
     <button class="nav-arrow nav-arrow--prev" id="prevBtn" aria-label="이전 페이지">&#8249;</button>
     <nav class="nav-dots" id="navDots">
@@ -881,8 +915,14 @@
   </main>
 
   <script>
+    // ?remote=1 turns this same file into the presenter's remote (a popup
+    // opened from the deck), so nothing heavy runs there
+    var REMOTE_MODE = /[?&]remote=1/.test(location.search);
+    if (REMOTE_MODE) document.documentElement.classList.add('remote-mode');
+
     // ----- Floating particles (generated once on the fixed backdrop) -----
     (function () {
+      if (REMOTE_MODE) return;
       var container = document.getElementById('particles');
       // Scale particle count with viewport area so large monitors aren't sparse.
       var COUNT = Math.min(180, Math.max(70,
@@ -931,6 +971,7 @@
         slides[current].id === 'roulette-content' || slides[current].id === 'pinball-content');
       // the closing video plays when its slide arrives and rests when it leaves
       if (typeof closingVideoOn === 'function') closingVideoOn(slides[current].id === 'closing');
+      pushRemote();
 
       // Cinematic depth: the focused slide sits forward, sharp and lit;
       // its neighbours fall back — smaller, dimmer, out of focus, tilted away.
@@ -986,6 +1027,40 @@
       d.addEventListener('click', function () { goTo(i); });
     });
 
+    // ----- Presenter remote: a popup of this same page that drives the deck -----
+    var remoteWin = null, remoteSeen = 0;
+    function remoteState() {
+      return { type: 'townhall-state', current: current, total: TOTAL,
+               labels: dots.map(function (d) { return { t: d.dataset.label, sub: d.classList.contains('nav-dot--sub') }; }) };
+    }
+    function pushRemote() {
+      if (remoteWin && !remoteWin.closed) { try { remoteWin.postMessage(remoteState(), '*'); } catch (err) {} }
+    }
+    function openRemote() {
+      var url = location.href.split('#')[0].split('?')[0] + '?remote=1';
+      remoteWin = window.open(url, 'townhallRemote', 'width=440,height=780,menubar=no,toolbar=no,location=no,status=no');
+      if (remoteWin) remoteWin.focus();
+    }
+    window.addEventListener('message', function (ev) {
+      var m = ev.data || {};
+      if (m.type !== 'townhall-cmd') return;
+      remoteSeen = Date.now();
+      if (ev.source) remoteWin = ev.source;
+      document.body.classList.add('remote-on');   // the bottom bar steps aside
+      if (m.cmd === 'next') next();
+      else if (m.cmd === 'prev') prev();
+      else if (m.cmd === 'goto') goTo(m.index | 0);
+      pushRemote();
+    });
+    setInterval(function () {
+      if (document.body.classList.contains('remote-on') &&
+          (Date.now() - remoteSeen > 4500 || !remoteWin || remoteWin.closed)) {
+        document.body.classList.remove('remote-on');
+      }
+    }, 1000);
+    var remoteBtn = document.getElementById('remoteBtn');
+    if (remoteBtn) remoteBtn.addEventListener('click', openRemote);
+
     // ----- Keyboard -----
     window.addEventListener('keydown', function (e) {
       if (e.defaultPrevented) return;
@@ -1002,6 +1077,8 @@
         e.preventDefault(); goTo(0);
       } else if (e.key === 'End') {
         e.preventDefault(); goTo(TOTAL - 1);
+      } else if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault(); openRemote();
       }
     });
 
@@ -1058,6 +1135,63 @@
         clearTimeout(ft);
         ft = setTimeout(fitTitles, 150);
       });
+    })();
+
+    // ----- the remote popup -----
+    (function () {
+      if (!REMOTE_MODE) return;
+      document.title = '리모컨 · 소통 @ 기구개발팀';
+      var ui = document.createElement('div');
+      ui.className = 'remote-ui';
+      ui.innerHTML =
+        '<div class="remote-head"><b>소통 @ 기구개발팀</b><span>리모컨 · <span id="rmPos">–</span></span></div>' +
+        '<div class="remote-big"><button id="rmPrev">&#8249; 이전</button><button id="rmNext">다음 &#8250;</button></div>' +
+        '<ol class="remote-list" id="rmList"></ol>' +
+        '<div class="remote-hint" id="rmHint">← → 또는 Space 키로 넘길 수 있습니다. 이 창이 열려 있는 동안 본 화면의 하단 컨트롤은 숨겨집니다.</div>';
+      document.body.appendChild(ui);
+      var main = window.opener, list = document.getElementById('rmList');
+      var pos = document.getElementById('rmPos'), hint = document.getElementById('rmHint');
+      var state = null;
+      function send(cmd, index) {
+        if (!main || main.closed) {
+          hint.className = 'remote-hint warn';
+          hint.textContent = '본 화면과 연결되지 않았습니다. 본 화면 오른쪽 아래의 리모컨 버튼(또는 R 키)으로 이 창을 열어 주세요.';
+          return;
+        }
+        main.postMessage({ type: 'townhall-cmd', cmd: cmd, index: index }, '*');
+      }
+      function draw() {
+        if (!state) return;
+        pos.textContent = (state.current + 1) + ' / ' + state.total;
+        list.innerHTML = '';
+        state.labels.forEach(function (l, i) {
+          var li = document.createElement('li');
+          li.className = (l.sub ? 'sub ' : '') + (i === state.current ? 'cur' : '');
+          var b = document.createElement('button');
+          b.innerHTML = '<span class="n">' + (i + 1) + '</span>';
+          b.appendChild(document.createTextNode(l.t));
+          b.addEventListener('click', function () { send('goto', i); });
+          li.appendChild(b); list.appendChild(li);
+        });
+        var cur = list.querySelector('.cur');
+        if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: 'nearest' });
+      }
+      window.addEventListener('message', function (ev) {
+        var m = ev.data || {};
+        if (m.type !== 'townhall-state') return;
+        state = m; draw();
+      });
+      document.getElementById('rmPrev').addEventListener('click', function () { send('prev'); });
+      document.getElementById('rmNext').addEventListener('click', function () { send('next'); });
+      document.addEventListener('keydown', function (e) {
+        if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].indexOf(e.key) !== -1) { e.preventDefault(); send('next'); }
+        else if (['ArrowLeft', 'ArrowUp', 'PageUp'].indexOf(e.key) !== -1) { e.preventDefault(); send('prev'); }
+        else if (e.key === 'Home') { e.preventDefault(); send('goto', 0); }
+        else if (e.key === 'End' && state) { e.preventDefault(); send('goto', state.total - 1); }
+      });
+      // a heartbeat keeps the deck's bar hidden while this window lives
+      send('hello');
+      setInterval(function () { send('hello'); }, 1500);
     })();
 
     // ----- closing video: plays on arrival, click for fullscreen, rests on leaving -----
@@ -1246,7 +1380,7 @@
     // runs on a corporate network that blocks most outside hosts.
     (function () {
       var cv = document.getElementById('drum');
-      if (!cv) return;
+      if (!cv || REMOTE_MODE) return;
       var ctx = cv.getContext('2d');
       var spinBtn   = document.getElementById('spinBtn');
       var winnerEl  = document.getElementById('winner');
@@ -2113,7 +2247,7 @@
     // across the goal line has won. Nothing steers a marble.
     (function () {
       var cv = document.getElementById('pinboard');
-      if (!cv) return;
+      if (!cv || REMOTE_MODE) return;
       var ctx = cv.getContext('2d');
       var $ = function (id) { return document.getElementById(id); };
       var spinBtn = $('pbSpinBtn'), shakeBtn = $('pbShakeBtn'), winnerEl = $('pbWinner');
