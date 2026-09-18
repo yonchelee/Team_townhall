@@ -1013,9 +1013,6 @@
         cv.height = Math.round(S * dpr);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         cx = S / 2; cy = S * 0.45; R = S * 0.355;
-        tubeW = S * 0.085;
-        Rt = R + S * 0.012 + tubeW / 2;
-        trayY = cy + Rt;
         sizeBalls();
         buildChrome();
       }
@@ -1131,6 +1128,10 @@
         gateBase = BR * (n <= 40 ? 1.7 : 1.3);
         gateHalf = gateBase;
         chuteW = Math.max(BR * 2.8, S * 0.06);
+        // the tube takes a ball at its drum size, so it widens for big balls
+        tubeW = Math.max(S * 0.085, BR * 2.3);
+        Rt = R + S * 0.012 + tubeW / 2;
+        trayY = cy + Rt;
       }
 
       // One gradient per ball per frame was costing ~4fps at a thousand balls,
@@ -1293,6 +1294,9 @@
         // the blower pulses like a real fan, so the plume breathes
         var JET = S * 7 * (0.9 + 0.25 * Math.sin(now * 0.009) + 0.12 * Math.sin(now * 0.023));
         if (pouring) JET *= 1.25;
+        // with the port open, air escapes through it and carries whatever is
+        // circulating nearby toward the mouth. Label-blind, like everything here.
+        var px = Math.cos(PORT), py = Math.sin(PORT), SUCK_R = R * 0.45;
 
         for (var i = 0; i < balls.length; i++) {
           var b = balls[i];
@@ -1316,6 +1320,14 @@
             b.vy -= lift * dt;
             b.vx += (ox / w) * lift * 0.22 * dt;        // spill outward inside the plume
             if (h < 0.3) b.vx -= (ox > 0 ? 1 : -1) * S * 0.7 * dt;   // coned floor feeds the nozzle
+            if (pouring) {
+              var qx = ox - px * R, qy = oy - py * R;
+              var qd = Math.sqrt(qx * qx + qy * qy) || 1;
+              if (qd < SUCK_R) {
+                var pull = S * 4 * (1 - qd / SUCK_R) / qd;
+                b.vx -= qx * pull * dt; b.vy -= qy * pull * dt;
+              }
+            }
           }
           b.vy += G * dt;
           b.vx += (Math.random() - 0.5) * AG * dt;
@@ -1490,13 +1502,27 @@
           phase = 'gate'; phaseStart = t;
           setGate(true);
         } else if (phase === 'drop' && ejected) {
-          var e = ejected;
+          var e = ejected, ppx = Math.cos(PORT), ppy = Math.sin(PORT);
           if (e.stage === 0) {
-            // out through the port into the tube
-            e.t += dt / 0.3;
-            var k = Math.min(1, e.t), rad = R + (Rt - R) * k;
-            e.x = cx + Math.cos(PORT) * rad; e.y = cy + Math.sin(PORT) * rad;
-            if (k >= 1) { e.stage = 1; e.th = PORT; e.om = 0.5; }
+            // through the passage on its own momentum plus the escaping air,
+            // easing onto the passage's axis as the walls guide it
+            var eox = e.x - cx, eoy = e.y - cy;
+            var along = eox * ppx + eoy * ppy, across = eoy * ppx - eox * ppy;
+            var va = Math.max(e.vx * ppx + e.vy * ppy, S * 0.35) + S * 2.5 * dt;
+            across *= Math.max(0, 1 - 8 * dt);
+            along += va * dt;
+            e.vx = ppx * va; e.vy = ppy * va;
+            e.x = cx + ppx * along - ppy * across; e.y = cy + ppy * along + ppx * across;
+            if (along >= Rt) {
+              e.stage = 1; e.th = PORT; e.om = Math.max(0.35, va / Rt * 0.5);
+              // a tiny ball grows to a size the tube can show
+              var tr = Math.max(e.r, Math.min(tubeW * 0.42, S * 0.03));
+              if (tr > e.r) {
+                e.r0 = e.r; e.r = tr;
+                e.sprite = makeSprite(e.c1, e.c2, String(e.ent.no), e.r);
+                e.since = t;
+              }
+            }
           } else {
             // rolls round the tube under gravity and stops in the tray
             e.om += (S * 2.6 / Rt) * Math.cos(e.th) * dt;
@@ -1557,12 +1583,8 @@
         wrap.classList.remove('is-mixing');
         winnerEl.innerHTML = '배출 중…';
         b.r0 = b.r;
-        b.r = Math.min(tubeW * 0.4, Math.max(BR * 1.5, S * 0.03));
-        b.sprite = makeSprite(b.c1, b.c2, String(b.ent.no), b.r);
         b.since = performance.now();
-        b.stage = 0; b.t = 0;
-        b.x = cx + Math.cos(PORT) * R; b.y = cy + Math.sin(PORT) * R;
-        b.vx = 0; b.vy = 0;
+        b.stage = 0;              // in the passage, still moving on its own momentum
       }
 
       function finishDraw() {
