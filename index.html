@@ -405,6 +405,20 @@
     animation:teleBeam .9s ease-out; }
   @keyframes teleBeam { 0%{transform:scaleX(.15); opacity:1;}
     55%{opacity:.8;} 100%{transform:scaleX(1); opacity:0;} }
+  /* the race column stacks the finishing order over the winners */
+  .side-stack { display:flex; flex-direction:column; gap:12px; width:100%;
+    max-width:640px; max-height:78vh; min-height:0; }
+  .side-stack .winners-panel { max-height:none; min-height:0; }
+  .side-stack .rank-panel { flex:0 0 auto; }
+  .side-stack .winners-panel:not(.rank-panel) { flex:1 1 auto; }
+  .rank-list { min-height:0; gap:6px; }
+  .rank-list li { padding:9px 14px; font-size:clamp(14px,1.25vw,22px); gap:10px; }
+  .rank-list li .no { width:1.8em; height:1.8em; font-size:.8em; }
+  .rank-list li.first { background:rgba(255,227,154,.16); border-color:rgba(255,227,154,.6); }
+  .rank-list li.first .no { background:#FFE39A; color:#0A2440; }
+  .rank-list .winners-empty { font-size:clamp(12px,1.1vw,16px); }
+  .opt select { margin-left:4px; padding:3px 6px; border-radius:6px;
+    background:rgba(255,255,255,.08); color:#fff; border:1px solid rgba(255,255,255,.22); }
   .winners-empty { font-size:clamp(14px,1.4vw,21px); color:rgba(190,215,255,.4);
     padding:4px 2px; }
   .reset-btn { padding:12px 22px; border-radius:999px; cursor:pointer;
@@ -643,6 +657,12 @@
         </label>
       </div>
       <label class="opt"><input type="checkbox" id="pbRemoveWinner" checked /> 당첨자 제외</label>
+      <label class="opt">당첨 등수
+        <select id="pbWinRank" aria-label="몇 등까지 당첨">
+          <option value="1" selected>1등만</option><option value="2">2등까지</option>
+          <option value="3">3등까지</option><option value="4">4등까지</option><option value="5">5등까지</option>
+        </select>
+      </label>
     </div>
   </div>
 
@@ -812,11 +832,17 @@
         </div>
 
         <div class="draw-side draw-side--right">
-        <aside class="winners-panel reveal" style="--d:.2s">
-          <div class="panel-title">당첨자 <span id="pbWinCount">0</span></div>
-          <ol class="winners-list" id="pbWinnersList"></ol>
-          <button class="reset-btn" id="pbResetBtn">초기화</button>
-        </aside>
+        <div class="side-stack">
+          <aside class="winners-panel rank-panel reveal" style="--d:.2s">
+            <div class="panel-title">레이스 순위 <span id="pbRankNote">1~5등</span></div>
+            <ol class="winners-list rank-list" id="pbRankList"></ol>
+          </aside>
+          <aside class="winners-panel reveal" style="--d:.25s">
+            <div class="panel-title">당첨자 <span id="pbWinCount">0</span></div>
+            <ol class="winners-list" id="pbWinnersList"></ol>
+            <button class="reset-btn" id="pbResetBtn">초기화</button>
+          </aside>
+        </div>
         </div>
       </div>
     </section>
@@ -2040,10 +2066,14 @@
       var rcMeta = $('pbRcMeta'), rcDept = $('pbRcDept');
       var boardEl = $('pbRosterBoard'), boardList = $('pbRosterList');
       var drawer = $('pbRosterDrawer'), openBtn = $('pbOpenRoster');
+      var rankList = $('pbRankList'), rankSel = $('pbWinRank');
 
       var MAX_BALLS = 1500;
       var STORE = 'luckydraw.roster';    // shared with the drum: one roster serves both games
       var MIX_MS = 2500;                 // shaking before the floor opens
+      var RANKS = 5;                     // places listed after the first is home
+      var RACE_TAIL_MS = 25000;          // the race ends this long after first place at the latest
+      var ranks = [], firstAt = 0;
 
       // The course is laid out in world units; the canvas is a camera on it.
       var WW = 26;                       // course width
@@ -2331,8 +2361,10 @@
       function step(dt, now) {
         var shaking = (phase === 'shake' || phase === 'mixing');
         var G = 12, VMAX = 22;
-        var sway = shaking ? 40 * Math.sin(now * 0.017) : 0;
-        var kick = shaking ? 55 * Math.max(0, Math.sin(now * 0.031)) : 0;
+        // the start box is an air-mix chamber like the drum: a jet from a
+        // nozzle in the floor lifts the marbles up the middle, they spill to
+        // the sides and slide back along the coned floor into the jet
+        var JET = shaking ? 95 * (0.9 + 0.25 * Math.sin(now * 0.009) + 0.12 * Math.sin(now * 0.023)) : 0;
         var rattle = (phase === 'race' && now - holeAt > 25000 && ((now - holeAt) % 4000) < 700);
         var h = dt / substeps;
         for (var sub = 0; sub < substeps; sub++) {
@@ -2342,8 +2374,14 @@
             var inBox = b.y < HOPPER_Y + b.r;
             b.vy += G * h;
             if (shaking && inBox) {
-              b.vx += sway * h + (Math.random() - 0.5) * 60 * h;
-              b.vy -= kick * h * (0.6 + Math.random() * 0.8);
+              var hh = (HOPPER_Y - b.y) / HOPPER_Y;                 // 0 at the floor, 1 at the top
+              var pw = WW * (0.10 + 0.45 * hh);                     // the plume widens as it rises
+              var ox = b.x - WW / 2;
+              var lift = JET * Math.exp(-(ox * ox) / (pw * pw)) * Math.max(0, 1.15 - hh);
+              b.vy -= lift * h;
+              b.vx += (ox / pw) * lift * 0.22 * h;
+              if (hh < 0.3) b.vx -= (ox > 0 ? 1 : -1) * 10 * h;    // coned floor feeds the nozzle
+              b.vx += (Math.random() - 0.5) * 30 * h; b.vy += (Math.random() - 0.5) * 30 * h;
             }
             if (inBox && !shaking && b.above) { b.vx *= 0.96; b.vy *= 0.96; }
             else b.vx += (Math.random() - 0.5) * 6 * h;
@@ -2483,10 +2521,22 @@
             ctx.fillStyle = '#fff'; ctx.fillText(nb.ent.n, nb.x, nb.y);
           }
         }
-        if (ejected) {
-          var k = Math.min(1, (now - ejected.since) / 500);
-          var e = ejected, big = { x: e.x, y: e.y, r: e.r * (1 + 2.2 * k), pi: e.pi, sprite: e.sprite };
-          drawBall(ctx, big, false, true);
+        for (var rk = 0; rk < ranks.length; rk++) {
+          var fb = ranks[rk];
+          var kk2 = Math.min(1, (now - fb.since) / 500);
+          var px2 = WW * (0.5 + (rk - (RANKS - 1) / 2) * 0.17), py2 = GOAL_Y + 2.2;
+          var big = { x: fb.x + (px2 - fb.x) * kk2, y: fb.y + (py2 - fb.y) * kk2,
+                      r: fb.r * (1 + (rk === 0 ? 2.2 : 1.4) * kk2), pi: fb.pi, sprite: fb.sprite };
+          drawBall(ctx, big, false, rk === 0);
+          if (kk2 >= 1) {
+            var fs2 = (rk === 0 ? 13 : 11) / s;
+            ctx.font = '700 ' + fs2.toFixed(3) + 'px ' + BALL_FONT;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.lineWidth = fs2 * 0.28; ctx.strokeStyle = 'rgba(3,11,26,.85)';
+            ctx.strokeText((rk + 1) + '등 ' + fb.ent.n, big.x, big.y + big.r + fs2 * 0.8);
+            ctx.fillStyle = rk === 0 ? '#FFE39A' : '#fff';
+            ctx.fillText((rk + 1) + '등 ' + fb.ent.n, big.x, big.y + big.r + fs2 * 0.8);
+          }
         }
         ctx.restore();
 
@@ -2523,7 +2573,10 @@
 
       // ---------- camera & loop ----------
       function updateCamera(dt) {
-        if (phase === 'race') {
+        if (phase === 'race' && ranks.length) {
+          // first place is home: watch the line as the rest come in
+          cam.tz = 2.0; cam.ty = GOAL_Y - 3; cam.tx = WW / 2;
+        } else if (phase === 'race') {
           var lead = leaders(1);
           if (lead.length) {
             var ly = lead[0].y;
@@ -2533,8 +2586,8 @@
             cam.ty = ly + vh * 0.22;
             cam.tx = WW / 2;
           }
-        } else if (phase === 'won' && ejected) {
-          cam.tz = 2.4; cam.ty = ejected.y; cam.tx = WW / 2;
+        } else if (phase === 'won' && ranks.length) {
+          cam.tz = 2.0; cam.ty = GOAL_Y + 1.5; cam.tx = WW / 2;
         } else {
           cam.tz = 1; cam.ty = viewH / 2; cam.tx = WW / 2;
         }
@@ -2553,6 +2606,9 @@
           phase = 'race'; phaseStart = t; holeAt = t;
           gateOpen = true;
           winnerEl.innerHTML = '레이스 진행 중';
+          renderRanks(false);
+        } else if (phase === 'race' && ranks.length && (t - firstAt > RACE_TAIL_MS || !stillRunning())) {
+          endRace();
         }
         step(dt, t);
         updateCamera(dt);
@@ -2571,8 +2627,8 @@
         if (on) ejected = null;
         wrap.classList.toggle('is-mixing', on);
         if (shakeBtn) { shakeBtn.classList.toggle('on', on); shakeBtn.textContent = on ? '흔들기 멈춤' : '공 흔들기'; }
-        if (on) winnerEl.innerHTML = '출발 상자를 흔드는 중';
-        else if (winnerEl.innerHTML === '출발 상자를 흔드는 중') winnerEl.innerHTML = '';
+        if (on) winnerEl.innerHTML = '바람으로 섞는 중';
+        else if (winnerEl.innerHTML === '바람으로 섞는 중') winnerEl.innerHTML = '';
       }
 
       function startDraw() {
@@ -2585,6 +2641,7 @@
         ejected = null;
         // every race starts from a full, freshly shuffled box
         if (phase !== 'shake') { gateOpen = false; spawnBalls(); }
+        ranks = []; renderRanks(false);
         wrap.classList.remove('show-name');
         phase = 'mixing'; phaseStart = performance.now();
         spinBtn.disabled = true;
@@ -2593,26 +2650,30 @@
         winnerEl.innerHTML = '섞는 중…';
       }
 
-      // called from clampStatics the moment a marble's centre crosses the goal
+      // called from clampStatics each time a marble's centre crosses the goal;
+      // the first is the winner, and the race runs on until RANKS are home
       function capture(b) {
-        ejected = b;
-        b.since = performance.now();
-        phase = 'won';
-        wrap.classList.remove('is-mixing');
-        finishDraw();
+        var now = performance.now();
+        b.done = true;                              // out of the simulation, parked at the line
+        b.since = now;
+        b.rank = ranks.length + 1;
+        ranks.push(b);
+        renderRanks(true);
+        var winRank = rankSel ? parseInt(rankSel.value, 10) || 1 : 1;
+        if (b.rank === 1) {
+          ejected = b; firstAt = now;
+          wrap.classList.remove('is-mixing');
+          wbName.textContent = b.ent.n;
+          wbDept.textContent = 'No.' + b.ent.no + (b.ent.d ? ' · ' + b.ent.d : '');
+          wrap.classList.add('show-name');
+          fireConfetti();
+          winnerEl.innerHTML = '골인! 축하합니다';
+        }
+        if (b.rank <= winRank) addWinner(b.ent);
+        if (ranks.length >= RANKS) endRace();
       }
 
-      function finishDraw() {
-        var won = ejected ? ejected.ent : null;
-        spinBtn.disabled = false;
-        if (shakeBtn) shakeBtn.disabled = false;
-        if (!won) { winnerEl.innerHTML = ''; return; }
-        ejected.done = true;                        // out of the simulation, shown at the line
-        wbName.textContent = won.n;
-        wbDept.textContent = 'No.' + won.no + (won.d ? ' · ' + won.d : '');
-        wrap.classList.add('show-name');
-        fireConfetti();
-        winnerEl.innerHTML = '골인! 축하합니다';
+      function addWinner(won) {
         winners.push({ n: won.n, d: won.d, no: won.no });
         renderWinners(true);
         if (removeChk.checked) {
@@ -2621,11 +2682,55 @@
           markDrawn(won.no);
         }
         updateCard();
+      }
+
+      function endRace() {
+        if (phase !== 'race') return;
+        phase = 'won';
+        spinBtn.disabled = false;
+        if (shakeBtn) shakeBtn.disabled = false;
+        if (ranks.length < RANKS) renderRanks(false);
         roundTimer = setTimeout(function () {
           if (phase !== 'won') return;
           ejected = null;
           gateOpen = false; spawnBalls();
         }, 7000);
+      }
+
+      function stillRunning() {
+        for (var i = 0; i < balls.length; i++) if (!balls[i].done) return true;
+        return false;
+      }
+
+      // ---------- finishing order ----------
+      function renderRanks(teleportLast) {
+        if (!rankList) return;
+        rankList.innerHTML = '';
+        if (!ranks.length) {
+          var e = document.createElement('div');
+          e.className = 'winners-empty';
+          e.textContent = phase === 'race' ? '레이스 진행 중…' : '레이스를 시작하면 순위가 표시됩니다';
+          rankList.appendChild(e);
+          return;
+        }
+        ranks.forEach(function (b, i) {
+          var li = document.createElement('li');
+          li.className = (teleportLast && i === ranks.length - 1 ? 'teleport ' : '') + (i === 0 ? 'first' : '');
+          var no = document.createElement('span');
+          no.className = 'no'; no.textContent = (i + 1) + '등';
+          li.appendChild(no);
+          var tw = document.createElement('span');
+          tw.className = 'w-text';
+          var nm = document.createElement('span');
+          nm.className = 'w-name'; nm.textContent = b.ent.n;
+          tw.appendChild(nm);
+          var dp = document.createElement('span');
+          dp.className = 'w-dept';
+          dp.textContent = 'No.' + b.ent.no + (b.ent.d ? ' · ' + b.ent.d : '');
+          tw.appendChild(dp);
+          li.appendChild(tw);
+          rankList.appendChild(li);
+        });
       }
 
       // ---------- roster board ----------
@@ -2746,7 +2851,7 @@
         if (shakeBtn) { shakeBtn.disabled = false; shakeBtn.classList.remove('on'); shakeBtn.textContent = '공 흔들기'; }
         wrap.classList.remove('is-mixing');
         wrap.classList.remove('show-name');
-        winners = [];
+        winners = []; ranks = [];
         if (list) basePool = list;
         basePool.forEach(function (e, i) { e.no = i + 1; });
         pool = basePool.slice();
@@ -2754,6 +2859,7 @@
         spawnBalls();
         renderBoard();
         renderWinners();
+        renderRanks(false);
         updateCard();
       }
 
@@ -2869,6 +2975,7 @@
       spawnBalls();
       renderBoard();
       renderWinners();
+      renderRanks(false);
       updateCard();
       cam.y = viewH / 2; cam.ty = cam.y;
       requestAnimationFrame(frame);
