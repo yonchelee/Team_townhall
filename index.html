@@ -516,7 +516,7 @@
       <button class="nav-dot" data-target="mi-part" data-label="AX전략과 미래"></button>
       <button class="nav-dot nav-dot--sub" data-target="mi-part-content" data-label="AX전략과 미래 내용"></button>
       <button class="nav-dot" data-target="roulette" data-label="Lucky Draw"></button>
-      <button class="nav-dot nav-dot--sub" data-target="roulette-content" data-label="돌려돌려 돌림판"></button>
+      <button class="nav-dot nav-dot--sub" data-target="roulette-content" data-label="행운의 추첨"></button>
       <button class="nav-dot" data-target="qna" data-label="소통이 필요해"></button>
       <button class="nav-dot nav-dot--sub" data-target="qna-content" data-label="소통이 필요해 내용"></button>
     </nav>
@@ -674,7 +674,7 @@
 
     <!-- Lucky Draw (제목) -->
     <section id="roulette" class="slide">
-      <h2 class="headline reveal" style="--d:.3s">Lucky Draw 돌려돌려 돌림판</h2>
+      <h2 class="headline reveal" style="--d:.3s">Lucky Draw 행운의 추첨</h2>
       <div class="rule" style="--d:.55s"></div>
     </section>
 
@@ -817,38 +817,7 @@
       i = Math.max(0, Math.min(TOTAL - 1, i));
       if (i === current) return;
       current = i;
-      // ----- Titles: as large as they can be on one line -----
-    // Measured rather than guessed: the size that fits depends on the font
-    // actually in use (SamsungOne vs a fallback) and on the viewport.
-    (function () {
-      var titles = Array.prototype.slice.call(document.querySelectorAll('.headline'));
-      if (!titles.length) return;
-
-      function fitTitles() {
-        titles.forEach(function (h) {
-          h.style.fontSize = '100px';            // measure at a known size
-          var avail = h.clientWidth;             // block width = slide content
-          var need = h.scrollWidth;              // full text width, unwrapped
-          if (!avail || !need) return;
-          // width scales linearly with font-size, so one ratio lands it
-          var size = 100 * (avail * 0.98) / need;
-          size = Math.max(28, Math.min(size, 280));
-          h.style.fontSize = size.toFixed(1) + 'px';
-        });
-      }
-
-      fitTitles();
-      // remeasure once the real font is in use, and on any resize
-      if (document.fonts && document.fonts.ready) {
-        document.fonts.ready.then(fitTitles).catch(function () {});
-      }
-      var t = null;
-      window.addEventListener('resize', function () {
-        clearTimeout(t);
-        t = setTimeout(fitTitles, 150);
-      });
-    })();
-
+      render();
     }
     function next() { goTo(current + 1); }
     function prev() { goTo(current - 1); }
@@ -907,6 +876,38 @@
         if (dx < 0) next(); else prev();
       }
     }, { passive: true });
+
+    // ----- Titles: as large as they can be on one line -----
+    // Measured rather than guessed: the size that fits depends on the font
+    // actually in use (SamsungOne vs a fallback) and on the viewport.
+    (function () {
+      var titles = Array.prototype.slice.call(document.querySelectorAll('.headline'));
+      if (!titles.length) return;
+
+      function fitTitles() {
+        titles.forEach(function (h) {
+          h.style.fontSize = '100px';            // measure at a known size
+          var avail = h.clientWidth;             // block width = slide content
+          var need = h.scrollWidth;              // full text width, unwrapped
+          if (!avail || !need) return;
+          // width scales linearly with font-size, so one ratio lands it
+          var size = 100 * (avail * 0.98) / need;
+          size = Math.max(28, Math.min(size, 280));
+          h.style.fontSize = size.toFixed(1) + 'px';
+        });
+      }
+
+      fitTitles();
+      // remeasure once the real font is in use, and on any resize
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(fitTitles).catch(function () {});
+      }
+      var ft = null;
+      window.addEventListener('resize', function () {
+        clearTimeout(ft);
+        ft = setTimeout(fitTitles, 150);
+      });
+    })();
 
     // ----- Lucky Draw: ball drum, roster, winners -----
     // Physics is hand-rolled rather than pulled from a CDN: this deck runs on
