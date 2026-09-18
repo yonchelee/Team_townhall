@@ -428,16 +428,6 @@
   body.drum-focus .sheen { animation-play-state:paused; }
   body.drum-focus .particles { display:none; }
 
-  /* ===== Content panel (내용 페이지) ===== */
-  .content-panel { width:min(88vw,1120px); min-height:46vh; margin-top:1vh;
-    border-radius:20px; background:rgba(255,255,255,.05);
-    border:1px solid rgba(255,255,255,.14);
-    -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
-    box-shadow:0 10px 40px rgba(3,11,26,.4);
-    display:flex; align-items:center; justify-content:center; padding:4vh 4vw; }
-  .placeholder-note { font-size:clamp(13px,1.15vw,17px);
-    color:rgba(190,215,255,.42); letter-spacing:.06em; }
-
   /* ===== Embedded page (사내 깃헙 페이지 임베드) ===== */
   /* Full-bleed: the embedded page fills the whole browser window */
   .slide--embed { padding:0; }
@@ -543,8 +533,6 @@
     <button class="nav-arrow nav-arrow--prev" id="prevBtn" aria-label="이전 페이지">&#8249;</button>
     <nav class="nav-dots" id="navDots">
       <button class="nav-dot" data-target="intro" data-label="소통"></button>
-      <button class="nav-dot" data-target="game" data-label="함께하는 게임"></button>
-      <button class="nav-dot nav-dot--sub" data-target="game-content" data-label="함께하는 게임 내용"></button>
       <button class="nav-dot" data-target="culture" data-label="함께 만드는 조직문화"></button>
       <button class="nav-dot nav-dot--sub" data-target="culture-content" data-label="함께 만드는 조직문화 내용"></button>
       <button class="nav-dot" data-target="video" data-label="The way we work"></button>
@@ -633,20 +621,6 @@
       <div class="at reveal" style="--d:.45s">@</div>
       <div class="team reveal" style="--d:.6s">기구개발팀</div>
       <div class="title-rule"></div>
-    </section>
-
-    <!-- 함께하는 게임 (제목) -->
-    <section id="game" class="slide">
-      <h2 class="headline reveal" style="--d:.3s">함께하는 게임</h2>
-      <div class="rule" style="--d:.55s"></div>
-    </section>
-
-    <!-- 함께하는 게임 (내용) -->
-    <section id="game-content" class="slide">
-      <div class="kicker reveal" style="--d:.1s">함께하는 게임</div>
-      <div class="content-panel reveal" style="--d:.3s">
-        <p class="placeholder-note">내용 준비 중</p>
-      </div>
     </section>
 
     <!-- 함께 만드는 조직문화 (제목) -->
