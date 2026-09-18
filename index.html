@@ -267,19 +267,19 @@
   .opt { display:inline-flex; align-items:center; gap:7px; cursor:pointer;
     font-size:clamp(10px,.95vw,13px); color:rgba(190,215,255,.75); }
 
-  /* ----- the dial, sized to fill the middle column ----- */
+  /* ----- the drum, sized to fill the middle column ----- */
   .roulette { flex:0 0 auto; width:min(74vh,46vw); display:flex;
     flex-direction:column; align-items:center; gap:1.3vh; }
-  .wheel-wrap { position:relative; width:100%; aspect-ratio:1; }
-  .wheel-wrap svg { width:100%; height:100%; display:block;
+  .drum-wrap { position:relative; width:100%; aspect-ratio:1; }
+  .drum-wrap canvas { width:100%; height:100%; display:block;
     filter:drop-shadow(0 14px 40px rgba(3,11,26,.7))
            drop-shadow(0 0 22px rgba(40,120,220,.28)); }
-  .wheel-glow { position:absolute; inset:-9%; border-radius:50%; pointer-events:none;
+  .drum-glow { position:absolute; inset:-9%; border-radius:50%; pointer-events:none;
     background:radial-gradient(circle, rgba(70,150,255,.34) 0%,
       rgba(70,150,255,.12) 46%, transparent 70%);
-    filter:blur(20px); opacity:.65;
-    transition:opacity .6s ease, transform .6s ease; }
-  .wheel-wrap.is-spinning .wheel-glow { opacity:1; transform:scale(1.06); }
+    filter:blur(20px); opacity:.6;
+    transition:opacity .7s ease, transform .7s ease; }
+  .drum-wrap.is-mixing .drum-glow { opacity:1; transform:scale(1.07); }
   /* the winner's name, ~5x the old size, laid over the dial so the dial
      itself keeps its full size */
   .winner-big { position:absolute; left:50%; top:50%; z-index:4;
@@ -296,7 +296,7 @@
   .winner-big::before { content:''; position:absolute; inset:-45% -22%; z-index:-1;
     background:radial-gradient(ellipse at center,
       rgba(2,8,20,.74) 0%, rgba(2,8,20,.45) 45%, transparent 72%); }
-  .wheel-wrap.show-name .winner-big { opacity:1;
+  .drum-wrap.show-name .winner-big { opacity:1;
     transform:translate(-50%,-50%) scale(1); }
 
   /* 축포 - two cannons firing from the lower corners */
@@ -312,35 +312,6 @@
     100% { transform:translate3d(var(--dx), 62vh, 0) rotate(var(--rot));
            opacity:0; }
   }
-
-  #flash { opacity:0; transform-origin:100px 100px; pointer-events:none; }
-  .wheel-wrap.is-won #flash { animation:flashOut .95s ease-out; }
-  @keyframes flashOut { 0%{opacity:.9; transform:scale(.2);}
-    100%{opacity:0; transform:scale(1);} }
-  #wheel { transform-origin:50% 50%;
-    transition:transform 4.2s cubic-bezier(.12,.72,.02,1); }
-  /* labels flip like a split-flap departure board when a name is swapped.
-     The radial rotation lives on a wrapping <g>, so this CSS transform is
-     free to drive the flap without clobbering it. */
-  #wheel g.lbl { transform-box:fill-box; transform-origin:center; }
-  #wheel g.lbl.flip { animation:flapFlip .2s cubic-bezier(.4,0,.6,1); }
-  @keyframes flapFlip {
-    0%   { transform:scaleY(1);   opacity:1; }
-    42%  { transform:scaleY(.06); opacity:.5; }
-    58%  { transform:scaleY(.06); opacity:.5; }
-    100% { transform:scaleY(1);   opacity:1; }
-  }
-  .pointer { position:absolute; top:-15px; left:50%; transform:translateX(-50%);
-    width:18px; height:32px; z-index:3; pointer-events:none; }
-  .pointer::before { content:''; position:absolute; left:50%; top:6px;
-    transform:translateX(-50%); width:0; height:0;
-    border-left:7px solid transparent; border-right:7px solid transparent;
-    border-top:26px solid #DCEBFF;
-    filter:drop-shadow(0 0 7px rgba(120,190,255,.9))
-           drop-shadow(0 2px 5px rgba(0,0,0,.55)); }
-  .pointer::after { content:''; position:absolute; left:50%; top:0;
-    transform:translateX(-50%); width:8px; height:8px; border-radius:50%;
-    background:#fff; box-shadow:0 0 12px 3px rgba(150,205,255,.95); }
 
   .spin-btn { padding:12px 36px; border-radius:999px; cursor:pointer;
     font-size:clamp(14px,1.3vw,20px); font-weight:700; color:#fff;
@@ -415,7 +386,7 @@
     .roster-card, .winners-panel { width:min(46vw,340px); max-width:none;
       max-height:34vh; }
     .roulette { flex:1 1 100%; order:-1; width:auto; }
-    .wheel-wrap { width:min(46vh,86vw); }
+    .drum-wrap { width:min(46vh,86vw); }
     .winners-list { min-height:14vh; }
   }
 
@@ -724,58 +695,15 @@
         </div>
 
         <div class="roulette">
-          <div class="wheel-wrap reveal" style="--d:.1s" id="wheelWrap">
-            <div class="wheel-glow"></div>
-            <div class="pointer"></div>
-            <svg viewBox="0 0 200 200" aria-label="돌림판">
-              <defs>
-                <radialGradient id="segA" cx="50%" cy="50%" r="52%">
-                  <stop offset="0%" stop-color="#2C6FC8" />
-                  <stop offset="100%" stop-color="#09254F" />
-                </radialGradient>
-                <radialGradient id="segB" cx="50%" cy="50%" r="52%">
-                  <stop offset="0%" stop-color="#1B7E8C" />
-                  <stop offset="100%" stop-color="#07223F" />
-                </radialGradient>
-                <radialGradient id="segC" cx="50%" cy="50%" r="52%">
-                  <stop offset="0%" stop-color="#4A56B8" />
-                  <stop offset="100%" stop-color="#0B1C45" />
-                </radialGradient>
-                <radialGradient id="hubG" cx="42%" cy="36%" r="70%">
-                  <stop offset="0%" stop-color="#BFDDFF" />
-                  <stop offset="45%" stop-color="#2A6FC4" />
-                  <stop offset="100%" stop-color="#04142E" />
-                </radialGradient>
-                <radialGradient id="flashG" cx="50%" cy="50%" r="50%">
-                  <stop offset="0%" stop-color="#EAF4FF" stop-opacity=".95" />
-                  <stop offset="60%" stop-color="#5FA8FF" stop-opacity=".35" />
-                  <stop offset="100%" stop-color="#5FA8FF" stop-opacity="0" />
-                </radialGradient>
-              </defs>
-
-              <g id="wheel"></g>
-
-              <g id="bezel">
-                <circle cx="100" cy="100" r="99" fill="none"
-                        stroke="rgba(120,190,255,.16)" stroke-width="1.4" />
-                <circle cx="100" cy="100" r="95.6" fill="none"
-                        stroke="rgba(255,255,255,.22)" stroke-width="0.7" />
-                <circle cx="100" cy="100" r="88" fill="none"
-                        stroke="rgba(255,255,255,.10)" stroke-width="0.5" />
-              </g>
-
-              <circle cx="100" cy="100" r="18" fill="url(#hubG)"
-                      stroke="rgba(255,255,255,.45)" stroke-width="1.1" />
-              <circle cx="100" cy="100" r="5.5" fill="#EAF4FF" opacity=".92" />
-
-              <circle id="flash" cx="100" cy="100" r="95" fill="url(#flashG)" />
-            </svg>
+          <div class="drum-wrap reveal" style="--d:.1s" id="drumWrap">
+            <div class="drum-glow"></div>
+            <canvas id="drum" aria-label="추첨기"></canvas>
             <div class="winner-big" id="winnerBig">
               <div class="wb-name" id="wbName"></div>
               <div class="wb-dept" id="wbDept"></div>
             </div>
           </div>
-          <button class="spin-btn reveal" style="--d:.25s" id="spinBtn">돌리기</button>
+          <button class="spin-btn reveal" style="--d:.25s" id="spinBtn">추첨 시작</button>
           <div class="winner reveal" style="--d:.3s" id="winner"></div>
         </div>
 
@@ -921,7 +849,6 @@
       });
     })();
 
-    render();
     }
     function next() { goTo(current + 1); }
     function prev() { goTo(current - 1); }
@@ -981,10 +908,15 @@
       }
     }, { passive: true });
 
-    // ----- Lucky Draw: dial, roster, winners -----
+    // ----- Lucky Draw: ball drum, roster, winners -----
+    // Physics is hand-rolled rather than pulled from a CDN: this deck runs on
+    // a corporate network that blocks most outside hosts, and a blocked script
+    // would leave the draw dead on stage. Circles bouncing inside a circle is
+    // a short bit of maths, so the file stays self-contained.
     (function () {
-      var wheel = document.getElementById('wheel');
-      if (!wheel) return;
+      var cv = document.getElementById('drum');
+      if (!cv) return;
+      var ctx = cv.getContext('2d');
       var spinBtn   = document.getElementById('spinBtn');
       var winnerEl  = document.getElementById('winner');
       var namesBox  = document.getElementById('namesBox');
@@ -995,6 +927,11 @@
       var removeChk = document.getElementById('removeWinner');
       var listEl    = document.getElementById('winnersList');
       var countEl   = document.getElementById('winCount');
+      var resetBtn  = document.getElementById('resetBtn');
+      var wrap      = document.getElementById('drumWrap');
+      var wbName    = document.getElementById('wbName');
+      var wbDept    = document.getElementById('wbDept');
+      var confettiEl = document.getElementById('confetti');
       var rcRemain  = document.getElementById('rcRemain');
       var rcTotal   = document.getElementById('rcTotal');
       var rcBar     = document.getElementById('rcBar');
@@ -1002,21 +939,15 @@
       var rcDept    = document.getElementById('rcDept');
       var drawer    = document.getElementById('rosterDrawer');
       var openBtn   = document.getElementById('openRoster');
-      var resetBtn  = document.getElementById('resetBtn');
-      var wrap      = document.getElementById('wheelWrap');
-      var wbName    = document.getElementById('wbName');
-      var wbDept    = document.getElementById('wbDept');
-      var confettiEl = document.getElementById('confetti');
 
-      // A dial can only carry so many legible labels. With a bigger roster we
-      // show a random handful, but the draw stays uniform over everyone:
-      // sample MAX_SEG entrants at random, then land on one of them at random.
-      var MAX_SEG = 28;
-      var DEPT_MAX = 14;          // above this the slices are too thin for a dept line
+      // The drum can only hold so many readable balls. With a bigger roster we
+      // load a random handful, but the draw stays uniform over everyone:
+      // sample BALLS entrants at random, then eject one of them at random.
+      var BALLS = 30;
       var STORE = 'luckydraw.roster';
-      var SVGNS = 'http://www.w3.org/2000/svg';
+      var FONT = '"SamsungOneKoreanOTF","Malgun Gothic","Apple SD Gothic Neo",sans-serif';
+      var MIX_MS = 3800, EJECT_MS = 1250;
 
-      // Each entrant is {n: name, d: department}
       var basePool = [
         { n: '참가자 1', d: '기구개발팀' }, { n: '참가자 2', d: '기구개발팀' },
         { n: '참가자 3', d: 'MI파트' },    { n: '참가자 4', d: 'MI파트' },
@@ -1024,25 +955,41 @@
         { n: '참가자 7', d: '선행개발' },  { n: '참가자 8', d: '선행개발' }
       ];
       var pool = basePool.slice();
-      var display = [];           // slices on the dial: {n, d, idx}
+      var display = [];          // entrants currently loaded as balls
       var winners = [];
-      var rotation = 0, spinning = false, pendingSeg = -1;
-      var labels = [], curCut = 10, flipTimers = {};
-      var needsResample = false, roundTimer = null, spinTimer = null;
+      var balls = [];
+      var phase = 'idle';        // idle | mixing | eject | won
+      var phaseT = 0, pendingIdx = -1, ejected = null;
+      var S = 0, cx = 0, cy = 0, R = 0, BR = 0, gateY = 0, trayY = 0, chuteW = 0;
+
+      var PALETTE = [
+        ['#8FCBFF', '#1E6FD0'], ['#9BE7EE', '#1B7E8C'], ['#BDB2FF', '#4A56B8'],
+        ['#FFD98A', '#C98F27'], ['#FFB3C7', '#C1466F'], ['#A8F0C0', '#2A8F5C']
+      ];
+
+      // ---------- geometry ----------
+      function layout() {
+        var box = cv.getBoundingClientRect();
+        var dpr = Math.min(window.devicePixelRatio || 1, 2);
+        S = Math.max(240, Math.round(Math.min(box.width, box.height)));
+        cv.width = Math.round(S * dpr);
+        cv.height = Math.round(S * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        cx = S / 2; cy = S * 0.425; R = S * 0.375;
+        BR = R * 0.118;
+        gateY = cy + R;
+        trayY = S * 0.93;
+        chuteW = BR * 2.6;
+      }
 
       // ---------- roster parsing ----------
-      // A pasted sheet can carry any number of columns in any order, so the
-      // name and department columns are detected rather than assumed.
       var rawRows = [], nameCol = 0, deptCol = 1, hasHeader = false;
-      // Header labels must match a whole cell. Substring matching mistook a
-      // data row for a header, because real values like "기구개발팀" contain 팀 —
-      // which silently dropped the first person from the roster.
       var NAME_HDR = /^(이름|성명|성함|사원명|직원명|name)$/i;
       var DEPT_HDR = /^(부서|부서명|팀|팀명|소속|소속부서|조직|관할조직|파트|department|dept|division|org|organization)$/i;
 
       function parseRows(text) {
         var t = String(text);
-        if (t.charCodeAt(0) === 65279) t = t.slice(1);   // strip a BOM
+        if (t.charCodeAt(0) === 65279) t = t.slice(1);
         var rows = [];
         t.split(/\r?\n/).forEach(function (ln) {
           if (!ln.trim()) return;
@@ -1056,10 +1003,8 @@
       function detectCols(rows) {
         var cols = 1;
         rows.forEach(function (r) { if (r.length > cols) cols = r.length; });
-        var dflt = cols < 2 ? -1 : 1;        // -1 means no department column
+        var dflt = cols < 2 ? -1 : 1;
         if (!rows.length) return { name: 0, dept: dflt, header: false };
-
-        // 1) an explicit header row
         var hn = -1, hd = -1;
         rows[0].forEach(function (c, i) {
           if (hn < 0 && NAME_HDR.test(c)) hn = i;
@@ -1070,9 +1015,6 @@
           if (hd < 0) hd = (hn === 0) ? dflt : 0;
           return { name: hn, dept: hd, header: true };
         }
-
-        // 2) no header. This sheet is 이름, 부서명, 관할조직, so trust that
-        //    order unless the first column looks like an id number.
         var idish = 0, seen0 = 0;
         rows.forEach(function (r) {
           var v = (r[0] || '').trim();
@@ -1080,13 +1022,8 @@
           seen0++;
           if (/^[0-9][0-9\-\s]*$/.test(v)) idish++;
         });
-        if (!seen0 || idish / seen0 < 0.5) {
-          return { name: 0, dept: dflt, header: false };
-        }
-
-        // 3) ids sit in the first column, so score the remaining ones:
-        //    people's names are 2-4 hangul, departments end in 팀/파트/실/...
-        var nScore = [], dScore = [];
+        if (!seen0 || idish / seen0 < 0.5) return { name: 0, dept: dflt, header: false };
+        var nS = [], dS = [];
         for (var c = 0; c < cols; c++) {
           var person = 0, deptish = 0, numeric = 0, seen = 0;
           rows.forEach(function (r) {
@@ -1097,15 +1034,15 @@
             if (/(팀|파트|그룹|실|센터|본부|담당|과|사업부|개발|연구소)$/.test(v)) deptish++;
             if (/^[0-9][0-9\-\s]*$/.test(v)) numeric++;
           });
-          nScore[c] = seen ? (person - deptish - numeric * 2) / seen : -9;
-          dScore[c] = seen ? (deptish - numeric * 2) / seen : -9;
+          nS[c] = seen ? (person - deptish - numeric * 2) / seen : -9;
+          dS[c] = seen ? (deptish - numeric * 2) / seen : -9;
         }
         var nIdx = 0;
-        for (var i2 = 1; i2 < cols; i2++) if (nScore[i2] > nScore[nIdx]) nIdx = i2;
+        for (var i2 = 1; i2 < cols; i2++) if (nS[i2] > nS[nIdx]) nIdx = i2;
         var dIdx = -1;
         for (var i3 = 0; i3 < cols; i3++) {
           if (i3 === nIdx) continue;
-          if (dIdx < 0 || dScore[i3] > dScore[dIdx]) dIdx = i3;
+          if (dIdx < 0 || dS[i3] > dS[dIdx]) dIdx = i3;
         }
         return { name: nIdx, dept: dIdx, header: false };
       }
@@ -1115,16 +1052,14 @@
           var el = t[0];
           if (!el) return;
           el.innerHTML = '';
-          if (t[2]) {                      // department may be left out
+          if (t[2]) {
             var none = document.createElement('option');
-            none.value = '-1';
-            none.textContent = '없음';
+            none.value = '-1'; none.textContent = '없음';
             el.appendChild(none);
           }
           for (var c = 0; c < cols; c++) {
             var o = document.createElement('option');
-            o.value = String(c);
-            o.textContent = (c + 1) + '열';
+            o.value = String(c); o.textContent = (c + 1) + '열';
             el.appendChild(o);
           }
           el.value = String(t[1]);
@@ -1142,35 +1077,326 @@
         return out;
       }
 
-      function clip(nm) {
-        return nm.length > curCut ? nm.slice(0, curCut) + '…' : nm;
-      }
-
-      // 0deg = 12 o'clock, angles run clockwise
-      function pointAt(deg, r) {
-        var a = (deg - 90) * Math.PI / 180;
-        return [100 + r * Math.cos(a), 100 + r * Math.sin(a)];
-      }
-
-      // ---------- which entrants the dial shows this round ----------
+      // ---------- load the drum ----------
       function prepareRound() {
         display = [];
-        if (pool.length <= MAX_SEG) {
+        var want = Math.min(BALLS, pool.length);
+        if (pool.length <= want) {
           for (var i = 0; i < pool.length; i++)
             display.push({ n: pool[i].n, d: pool[i].d, idx: i });
         } else {
-          var taken = {}, picked = 0;
-          while (picked < MAX_SEG) {
+          var taken = {}, got = 0;
+          while (got < want) {
             var r = Math.floor(Math.random() * pool.length);
             if (taken[r]) continue;
-            taken[r] = 1; picked++;
+            taken[r] = 1; got++;
             display.push({ n: pool[r].n, d: pool[r].d, idx: r });
           }
         }
+        spawnBalls();
         updateCard();
       }
 
-      // Audience-facing summary: how many are still in, how far along we are
+      function spawnBalls() {
+        balls = [];
+        ejected = null;
+        display.forEach(function (e, i) {
+          var a = Math.random() * Math.PI * 2;
+          var rad = Math.random() * (R - BR * 1.4);
+          var c = PALETTE[i % PALETTE.length];
+          balls.push({
+            x: cx + Math.cos(a) * rad, y: cy + Math.sin(a) * rad,
+            vx: (Math.random() - 0.5) * S * 0.5,
+            vy: (Math.random() - 0.5) * S * 0.5,
+            r: BR, c1: c[0], c2: c[1], label: e.n, seg: i
+          });
+        });
+      }
+
+      // ---------- physics ----------
+      // Constraints are relaxed in passes and the wall is always enforced
+      // last. Resolving ball-ball overlap can shove a ball through the glass,
+      // so a single wall pass before the collisions let them escape.
+      function clampWall() {
+        for (var i = 0; i < balls.length; i++) {
+          var q = balls[i];
+          if (q === ejected) continue;
+          var dx = q.x - cx, dy = q.y - cy;
+          var d = Math.hypot(dx, dy) || 1;
+          var lim = R - q.r;
+          if (d > lim) {
+            var nx = dx / d, ny = dy / d;
+            q.x = cx + nx * lim; q.y = cy + ny * lim;
+            var vn = q.vx * nx + q.vy * ny;
+            if (vn > 0) { q.vx -= 1.72 * vn * nx; q.vy -= 1.72 * vn * ny; }
+          }
+        }
+      }
+
+      function resolvePairs() {
+        for (var i = 0; i < balls.length; i++) {
+          var a1 = balls[i];
+          if (a1 === ejected) continue;
+          for (var j = i + 1; j < balls.length; j++) {
+            var a2 = balls[j];
+            if (a2 === ejected) continue;
+            var ddx = a2.x - a1.x, ddy = a2.y - a1.y;
+            var dd = Math.hypot(ddx, ddy);
+            var mind = a1.r + a2.r;
+            if (dd >= mind) continue;
+            if (dd < 0.0001) { ddx = (Math.random() - 0.5); ddy = -1; dd = 1; }
+            var ux = ddx / dd, uy = ddy / dd, push = (mind - dd) / 2;
+            a1.x -= ux * push; a1.y -= uy * push;
+            a2.x += ux * push; a2.y += uy * push;
+            var rv = (a2.vx - a1.vx) * ux + (a2.vy - a1.vy) * uy;
+            if (rv < 0) {
+              var imp = -1.72 * rv / 2;
+              a1.vx -= imp * ux; a1.vy -= imp * uy;
+              a2.vx += imp * ux; a2.vy += imp * uy;
+            }
+          }
+        }
+      }
+
+      function step(dt) {
+        var mixing = (phase === 'mixing');
+        var G = S * 1.5;
+        var AG = mixing ? S * 7 : S * 0.7;     // random buffeting
+        var SW = mixing ? S * 2.6 : 0;         // swirl, like the blower
+        var DAMP = mixing ? 0.997 : 0.988;
+        var VMAX = S * 2.2;                    // keeps a ball from tunnelling
+
+        for (var i = 0; i < balls.length; i++) {
+          var b = balls[i];
+          if (b === ejected) continue;
+          b.vy += G * dt;
+          b.vx += (Math.random() - 0.5) * AG * dt;
+          b.vy += (Math.random() - 0.5) * AG * dt;
+          if (SW) {
+            var ox = b.x - cx, oy = b.y - cy;
+            var m = Math.hypot(ox, oy) || 1;
+            b.vx += (-oy / m) * SW * dt;
+            b.vy += (ox / m) * SW * dt;
+          }
+          b.vx *= DAMP; b.vy *= DAMP;
+          var sp = Math.hypot(b.vx, b.vy);
+          if (sp > VMAX) { b.vx = b.vx / sp * VMAX; b.vy = b.vy / sp * VMAX; }
+          b.x += b.vx * dt; b.y += b.vy * dt;
+        }
+
+        for (var it = 0; it < 3; it++) { resolvePairs(); clampWall(); }
+      }
+
+      // ---------- drawing ----------
+      function roundRect(x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+      }
+
+      function drawBall(b, glow) {
+        var g = ctx.createRadialGradient(
+          b.x - b.r * 0.38, b.y - b.r * 0.42, b.r * 0.08, b.x, b.y, b.r);
+        g.addColorStop(0, b.c1); g.addColorStop(1, b.c2);
+        if (glow) { ctx.shadowColor = 'rgba(255,240,180,.95)'; ctx.shadowBlur = b.r * 1.6; }
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 6.2832);
+        ctx.fillStyle = g; ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = Math.max(1, b.r * 0.06);
+        ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.stroke();
+        // printed label disc
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 0.64, 0, 6.2832);
+        ctx.fillStyle = 'rgba(255,255,255,.94)'; ctx.fill();
+        var fs = b.r * 0.46, txt = b.label;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = '700 ' + fs.toFixed(1) + 'px ' + FONT;
+        var guard = 0;
+        while (ctx.measureText(txt).width > b.r * 1.12 && fs > 5 && guard++ < 30) {
+          fs -= 0.6;
+          ctx.font = '700 ' + fs.toFixed(1) + 'px ' + FONT;
+        }
+        ctx.fillStyle = '#0A2440';
+        ctx.fillText(txt, b.x, b.y);
+      }
+
+      function render() {
+        ctx.clearRect(0, 0, S, S);
+
+        // exit chute, behind the drum
+        var cwl = cx - chuteW / 2;
+        roundRect(cwl, gateY - R * 0.05, chuteW, trayY - gateY + R * 0.1, chuteW * 0.3);
+        ctx.fillStyle = 'rgba(12,34,70,.55)'; ctx.fill();
+        ctx.lineWidth = Math.max(1, S * 0.004);
+        ctx.strokeStyle = 'rgba(160,205,255,.32)'; ctx.stroke();
+
+        // tray
+        roundRect(cx - chuteW * 0.92, trayY - chuteW * 0.16, chuteW * 1.84,
+                  chuteW * 0.52, chuteW * 0.22);
+        ctx.fillStyle = 'rgba(10,30,62,.7)'; ctx.fill();
+        ctx.strokeStyle = 'rgba(160,205,255,.3)'; ctx.stroke();
+
+        // glass body
+        var bg = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.35, R * 0.08, cx, cy, R);
+        bg.addColorStop(0, 'rgba(130,185,255,.12)');
+        bg.addColorStop(0.65, 'rgba(24,64,124,.16)');
+        bg.addColorStop(1, 'rgba(6,20,45,.34)');
+        ctx.beginPath(); ctx.arc(cx, cy, R, 0, 6.2832);
+        ctx.fillStyle = bg; ctx.fill();
+
+        // balls, clipped inside the glass
+        ctx.save();
+        ctx.beginPath(); ctx.arc(cx, cy, R - 1, 0, 6.2832); ctx.clip();
+        balls.forEach(function (b) { if (b !== ejected) drawBall(b, false); });
+        ctx.restore();
+
+        // the drawn ball rides the chute outside the glass
+        if (ejected) drawBall(ejected, true);
+
+        // rim
+        ctx.beginPath(); ctx.arc(cx, cy, R, 0, 6.2832);
+        ctx.lineWidth = R * 0.035;
+        ctx.strokeStyle = 'rgba(185,222,255,.5)';
+        ctx.shadowColor = 'rgba(60,140,255,.85)'; ctx.shadowBlur = R * 0.13;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // specular sweep and a soft inner edge
+        ctx.beginPath();
+        ctx.arc(cx, cy, R * 0.9, Math.PI * 1.06, Math.PI * 1.48);
+        ctx.lineWidth = R * 0.055;
+        ctx.strokeStyle = 'rgba(255,255,255,.2)';
+        ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx, cy, R * 0.965, 0, 6.2832);
+        ctx.lineWidth = R * 0.02;
+        ctx.strokeStyle = 'rgba(255,255,255,.08)';
+        ctx.stroke();
+
+        // gate mouth
+        ctx.beginPath();
+        ctx.moveTo(cwl, gateY - R * 0.02); ctx.lineTo(cx + chuteW / 2, gateY - R * 0.02);
+        ctx.lineWidth = Math.max(1, S * 0.006);
+        ctx.strokeStyle = phase === 'eject' ? 'rgba(255,225,150,.9)' : 'rgba(160,205,255,.35)';
+        ctx.stroke();
+      }
+
+      // ---------- loop ----------
+      var last = 0;
+      function frame(t) {
+        if (!last) last = t;
+        var dt = Math.min((t - last) / 1000, 0.033);
+        last = t;
+
+        if (phase === 'mixing') {
+          phaseT += dt * 1000;
+          if (phaseT >= MIX_MS) beginEject();
+        } else if (phase === 'eject' && ejected) {
+          phaseT += dt * 1000;
+          var k = Math.min(phaseT / EJECT_MS, 1);
+          var e = k < 0.5
+            ? (k / 0.5) * 0.5                                  // drift to the gate
+            : 0.5 + Math.pow((k - 0.5) / 0.5, 1.7) * 0.5;      // then drop away
+          ejected.x = ejected.sx + (cx - ejected.sx) * Math.min(1, e * 2);
+          ejected.y = ejected.sy + (trayY - ejected.sy) * e;
+          if (k >= 1) finishDraw();
+        }
+
+        step(dt);
+        render();
+        requestAnimationFrame(frame);
+      }
+
+      // ---------- draw lifecycle ----------
+      function startDraw() {
+        if (phase === 'mixing' || phase === 'eject') return;
+        if (needsResample) resample();
+        if (!pool.length || !display.length) {
+          winnerEl.innerHTML = '명단이 비었습니다 · 초기화를 눌러 주세요';
+          return;
+        }
+        phase = 'mixing'; phaseT = 0;
+        pendingIdx = Math.floor(Math.random() * display.length);
+        spinBtn.disabled = true;
+        wrap.classList.remove('show-name');
+        wrap.classList.add('is-mixing');
+        winnerEl.innerHTML = '추첨 중…';
+        balls.forEach(function (b) {          // kick everything into motion
+          b.vx += (Math.random() - 0.5) * S * 2.2;
+          b.vy += (Math.random() - 0.5) * S * 2.2;
+        });
+      }
+
+      function beginEject() {
+        var b = balls[pendingIdx];
+        if (!b) { finishDraw(); return; }
+        ejected = b;
+        b.sx = b.x; b.sy = b.y;
+        phase = 'eject'; phaseT = 0;
+        wrap.classList.remove('is-mixing');
+      }
+
+      function finishDraw() {
+        var won = display[pendingIdx];
+        phase = 'won';
+        spinBtn.disabled = false;
+        if (!won) { winnerEl.innerHTML = ''; needsResample = true; return; }
+        wbName.textContent = won.n;
+        wbDept.textContent = won.d || '';
+        wrap.classList.add('show-name');
+        fireConfetti();
+        winnerEl.innerHTML = '축하합니다';
+        winners.push({ n: won.n, d: won.d });
+        renderWinners(true);
+        if (removeChk.checked) pool.splice(won.idx, 1);
+        updateCard();
+        needsResample = true;
+        roundTimer = setTimeout(resample, 1600);
+      }
+
+      var needsResample = false, roundTimer = null;
+      function resample() {
+        clearTimeout(roundTimer); roundTimer = null;
+        phase = 'idle';
+        prepareRound();
+        needsResample = false;
+      }
+
+      // ---------- winners ----------
+      function renderWinners(teleportLast) {
+        countEl.textContent = winners.length;
+        listEl.innerHTML = '';
+        if (!winners.length) {
+          var e = document.createElement('div');
+          e.className = 'winners-empty';
+          e.textContent = '아직 당첨자가 없습니다';
+          listEl.appendChild(e);
+          return;
+        }
+        winners.forEach(function (w, i) {
+          var li = document.createElement('li');
+          if (teleportLast && i === winners.length - 1) li.className = 'teleport';
+          var no = document.createElement('span');
+          no.className = 'no'; no.textContent = i + 1;
+          li.appendChild(no);
+          var tw = document.createElement('span');
+          tw.className = 'w-text';
+          var nm = document.createElement('span');
+          nm.className = 'w-name'; nm.textContent = w.n;
+          tw.appendChild(nm);
+          if (w.d) {
+            var dp = document.createElement('span');
+            dp.className = 'w-dept'; dp.textContent = w.d;
+            tw.appendChild(dp);
+          }
+          li.appendChild(tw);
+          listEl.appendChild(li);
+        });
+        listEl.scrollTop = listEl.scrollHeight;
+      }
+
       function updateCard() {
         var total = basePool.length, left = pool.length, drawn = total - left;
         if (rcRemain) rcRemain.textContent = left;
@@ -1187,135 +1413,6 @@
       }
 
       function setDrawer(on) { if (drawer) drawer.classList.toggle('open', on); }
-
-      function buildBezel() {
-        var g = document.getElementById('bezel');
-        if (!g || g.getAttribute('data-built')) return;
-        g.setAttribute('data-built', '1');
-        for (var i = 0; i < 60; i++) {
-          var a = i * 6, major = (i % 5 === 0);
-          var p1 = pointAt(a, major ? 91.5 : 93.2), p2 = pointAt(a, 95.4);
-          var l = document.createElementNS(SVGNS, 'line');
-          l.setAttribute('x1', p1[0].toFixed(2)); l.setAttribute('y1', p1[1].toFixed(2));
-          l.setAttribute('x2', p2[0].toFixed(2)); l.setAttribute('y2', p2[1].toFixed(2));
-          l.setAttribute('stroke', major ? 'rgba(180,220,255,.5)' : 'rgba(255,255,255,.18)');
-          l.setAttribute('stroke-width', major ? '0.9' : '0.5');
-          g.appendChild(l);
-        }
-      }
-
-      function draw() {
-        labels = []; flipTimers = {};
-        while (wheel.firstChild) wheel.removeChild(wheel.firstChild);
-        var n = display.length;
-        if (!n) {
-          var c = document.createElementNS(SVGNS, 'circle');
-          c.setAttribute('cx', '100'); c.setAttribute('cy', '100');
-          c.setAttribute('r', '95');
-          c.setAttribute('fill', 'rgba(255,255,255,.05)');
-          c.setAttribute('stroke', 'rgba(255,255,255,.2)');
-          c.setAttribute('stroke-width', '0.8');
-          wheel.appendChild(c);
-          return;
-        }
-        var seg = 360 / n;
-        var fs = n <= 10 ? 6.2 : n <= 18 ? 5.2 : 4.5;
-        curCut = n <= 10 ? 12 : n <= 18 ? 9 : 7;
-        var showDept = n <= DEPT_MAX;
-
-        for (var i = 0; i < n; i++) {
-          var a0 = i * seg, a1 = (i + 1) * seg;
-          var p0 = pointAt(a0, 95), p1 = pointAt(a1, 95);
-          var path = document.createElementNS(SVGNS, 'path');
-          path.setAttribute('d',
-            'M100,100 L' + p0[0].toFixed(2) + ',' + p0[1].toFixed(2) +
-            ' A95,95 0 ' + (seg > 180 ? 1 : 0) + ',1 ' +
-            p1[0].toFixed(2) + ',' + p1[1].toFixed(2) + ' Z');
-          var gi = i % 3;
-          if (i === n - 1 && gi === 0) gi = 1;   // keep the seam from matching
-          path.setAttribute('fill', 'url(#seg' + 'ABC'.charAt(gi) + ')');
-          path.setAttribute('stroke', 'rgba(255,255,255,.15)');
-          path.setAttribute('stroke-width', '0.5');
-          wheel.appendChild(path);
-
-          // Names sit centred on the middle of their slice and run along the
-          // radius: the arc runs out of room as slices multiply, the radius
-          // does not. Flipped on the left half so they still read normally.
-          var mid = a0 + seg / 2, tp = pointAt(mid, 58);
-          var tx = tp[0].toFixed(2), ty = tp[1];
-          var rot = document.createElementNS(SVGNS, 'g');
-          rot.setAttribute('transform', 'rotate(' +
-            (mid <= 180 ? mid - 90 : mid + 90) + ' ' + tx + ' ' + ty.toFixed(2) + ')');
-          // the flip animates this inner group, so it can carry two lines
-          var lbl = document.createElementNS(SVGNS, 'g');
-          lbl.setAttribute('class', 'lbl');
-
-          var hasD = showDept && display[i].d;
-          var nm = document.createElementNS(SVGNS, 'text');
-          nm.setAttribute('x', tx);
-          nm.setAttribute('y', (hasD ? ty - fs * 0.42 : ty).toFixed(2));
-          nm.setAttribute('fill', '#EAF4FF');
-          nm.setAttribute('font-size', String(fs));
-          nm.setAttribute('font-weight', '700');
-          nm.setAttribute('text-anchor', 'middle');
-          nm.setAttribute('dominant-baseline', 'middle');
-          nm.textContent = clip(display[i].n);
-          lbl.appendChild(nm);
-
-          var dp = null;
-          if (hasD) {
-            dp = document.createElementNS(SVGNS, 'text');
-            dp.setAttribute('x', tx);
-            dp.setAttribute('y', (ty + fs * 0.72).toFixed(2));
-            dp.setAttribute('fill', 'rgba(182,214,255,.78)');
-            dp.setAttribute('font-size', (fs * 0.64).toFixed(2));
-            dp.setAttribute('font-weight', '500');
-            dp.setAttribute('text-anchor', 'middle');
-            dp.setAttribute('dominant-baseline', 'middle');
-            dp.textContent = clip(display[i].d);
-            lbl.appendChild(dp);
-          }
-
-          rot.appendChild(lbl);
-          wheel.appendChild(rot);
-          labels[i] = { g: lbl, nm: nm, dp: dp };
-        }
-      }
-
-      function renderWinners(teleportLast) {
-        countEl.textContent = winners.length;
-        listEl.innerHTML = '';
-        if (!winners.length) {
-          var e = document.createElement('div');
-          e.className = 'winners-empty';
-          e.textContent = '아직 당첨자가 없습니다';
-          listEl.appendChild(e);
-          return;
-        }
-        winners.forEach(function (w, i) {
-          var li = document.createElement('li');
-          if (teleportLast && i === winners.length - 1) li.className = 'teleport';
-          var no = document.createElement('span');
-          no.className = 'no';
-          no.textContent = i + 1;
-          li.appendChild(no);
-          var tw = document.createElement('span');
-          tw.className = 'w-text';
-          var nm = document.createElement('span');
-          nm.className = 'w-name';
-          nm.textContent = w.n;
-          tw.appendChild(nm);
-          if (w.d) {
-            var dp = document.createElement('span');
-            dp.className = 'w-dept';
-            dp.textContent = w.d;
-            tw.appendChild(dp);
-          }
-          li.appendChild(tw);
-          listEl.appendChild(li);
-        });
-        listEl.scrollTop = listEl.scrollHeight;
-      }
 
       // ---------- 축포 ----------
       var CONF = ['#EAF4FF','#5FA8FF','#1E6FD0','#7FD8E8','#9B8CFF','#FFD98A'];
@@ -1349,145 +1446,19 @@
         }, 3400);
       }
 
-      // ---------- idle flap board ----------
-      function flipLabel(i) {
-        var L = labels[i];
-        if (!L) return;
-        if (flipTimers[i]) {
-          clearTimeout(flipTimers[i][0]); clearTimeout(flipTimers[i][1]);
-        }
-        L.g.classList.remove('flip');
-        void L.g.getBoundingClientRect();
-        L.g.classList.add('flip');
-        flipTimers[i] = [
-          setTimeout(function () {
-            if (labels[i] !== L || !display[i]) return;
-            L.nm.textContent = clip(display[i].n);
-            if (L.dp) L.dp.textContent = clip(display[i].d || '');
-          }, 80),
-          setTimeout(function () {
-            L.g.classList.remove('flip');
-            delete flipTimers[i];
-          }, 210)
-        ];
-      }
-
-      // Keeps running through the spin so the dial stays alive while it turns.
-      // The slice that will win is left untouched: the winner is read from
-      // display[], so changing it mid-spin would desync the announced name
-      // from whatever the pointer lands on.
-      function flipSome() {
-        if (!display.length) return;
-        if (pool.length <= display.length) return;
-        var used = {};
-        display.forEach(function (d) { used[d.idx] = 1; });
-        for (var k = 0; k < 3; k++) {
-          var slot = Math.floor(Math.random() * display.length);
-          if (spinning && slot === pendingSeg) continue;   // freeze the winner
-          var ni = -1;
-          for (var t = 0; t < 40; t++) {
-            var c = Math.floor(Math.random() * pool.length);
-            if (!used[c]) { ni = c; break; }
-          }
-          if (ni < 0) continue;
-          delete used[display[slot].idx];
-          used[ni] = 1;
-          display[slot] = { n: pool[ni].n, d: pool[ni].d, idx: ni };
-          flipLabel(slot);
-        }
-      }
-      setInterval(flipSome, 200);
-
-      // ---------- spin lifecycle ----------
-      function resample() {
-        clearTimeout(roundTimer); roundTimer = null;
-        prepareRound(); draw();
-        needsResample = false;
-      }
-
-      function finishSpin() {
-        if (!spinning) return;
-        spinning = false;
-        clearTimeout(spinTimer); spinTimer = null;
-        spinBtn.disabled = false;
-        var won = display[pendingSeg];
-        if (!won) {
-          wrap.classList.remove('is-spinning');
-          winnerEl.innerHTML = '';
-          needsResample = true;
-          return;
-        }
-        wrap.classList.remove('is-spinning');
-        wrap.classList.remove('is-won');
-        void wrap.offsetWidth;              // restart the burst
-        wrap.classList.add('is-won');
-        setTimeout(function () { wrap.classList.remove('is-won'); }, 1000);
-        wbName.textContent = won.n;
-        wbDept.textContent = won.d || '';
-        wrap.classList.add('show-name');
-        fireConfetti();
-        winnerEl.innerHTML = '축하합니다';
-        winners.push({ n: won.n, d: won.d });
-        renderWinners(true);
-        if (removeChk.checked) pool.splice(won.idx, 1);
-        updateCard();
-        needsResample = true;
-        roundTimer = setTimeout(resample, 1400);
-      }
-
-      function spin() {
-        if (spinning) return;
-        if (needsResample) resample();
-        if (!pool.length || !display.length) {
-          winnerEl.innerHTML = '명단이 비었습니다 · 초기화를 눌러 주세요';
-          return;
-        }
-        spinning = true;
-        spinBtn.disabled = true;
-        wrap.classList.remove('show-name');
-        wrap.classList.add('is-spinning');
-        winnerEl.innerHTML = '추첨 중…';
-
-        var n = display.length, seg = 360 / n;
-        pendingSeg = Math.floor(Math.random() * n);
-        var target = pendingSeg * seg + seg * (0.2 + Math.random() * 0.6);
-        var turns = 5 + Math.floor(Math.random() * 4);
-        var want = ((360 - target) % 360 + 360) % 360;
-        var cur = ((rotation % 360) + 360) % 360;
-        var delta = ((want - cur) % 360 + 360) % 360;
-        rotation += turns * 360 + delta;
-        wheel.style.transition = '';
-        wheel.style.transform = 'rotate(' + rotation + 'deg)';
-        // failsafe so a missed transitionend can never lock the dial
-        spinTimer = setTimeout(finishSpin, 5200);
-      }
-
-      wheel.addEventListener('transitionend', function (e) {
-        if (e.propertyName && e.propertyName !== 'transform') return;
-        finishSpin();
-      });
-
-      // ---------- reset / roster loading ----------
+      // ---------- reset / roster ----------
       function restore(list) {
-        clearTimeout(roundTimer); clearTimeout(spinTimer);
-        roundTimer = spinTimer = null;
-        spinning = false;
+        clearTimeout(roundTimer); roundTimer = null;
+        phase = 'idle'; phaseT = 0; ejected = null;
         spinBtn.disabled = false;
-        wrap.classList.remove('is-spinning');
+        wrap.classList.remove('is-mixing');
         wrap.classList.remove('show-name');
         winners = [];
         if (list) basePool = list;
         pool = basePool.slice();
-        rotation = 0;
-        wheel.style.transition = 'none';
-        wheel.style.transform = 'rotate(0deg)';
-        prepareRound(); draw();
+        prepareRound();
         needsResample = false;
-        updateCard();
         renderWinners();
-        requestAnimationFrame(function () {
-          requestAnimationFrame(function () { wheel.style.transition = ''; });
-        });
       }
 
       function loadRoster(text, redetect) {
@@ -1508,14 +1479,11 @@
         var list = loadRoster(namesBox.value, redetect !== false);
         if (list.length < 2) { winnerEl.innerHTML = '두 명 이상 입력해 주세요'; return; }
         restore(list);
-        // remembered on this machine only - nothing is uploaded anywhere
         try {
           localStorage.setItem(STORE, JSON.stringify({
             t: namesBox.value, n: nameCol, d: deptCol, h: hasHeader
           }));
         } catch (err) {}
-        var cols = 1;
-        rawRows.forEach(function (r) { if (r.length > cols) cols = r.length; });
         setDrawer(false);
         var withDept = list.filter(function (e) { return e.d; }).length;
         winnerEl.innerHTML = list.length + '명 등록 · 이름 ' + (nameCol + 1) + '열' +
@@ -1527,9 +1495,9 @@
         restore(null);
         winnerEl.innerHTML = '';
       });
-      spinBtn.addEventListener('click', spin);
+      spinBtn.addEventListener('click', startDraw);
       spinBtn.addEventListener('keydown', function (e) {
-        if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); spin(); }
+        if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); startDraw(); }
       });
       if (openBtn) openBtn.addEventListener('click', function () { setDrawer(true); });
       if (drawer) {
@@ -1538,12 +1506,9 @@
         });
       }
       document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && drawer && drawer.classList.contains('open')) {
-          setDrawer(false);
-        }
+        if (e.key === 'Escape' && drawer && drawer.classList.contains('open')) setDrawer(false);
       });
       applyBtn.addEventListener('click', function () { applyRoster(true); });
-      // changing a column re-reads the same sheet without re-detecting
       [nameColEl, deptColEl].forEach(function (el) {
         if (!el) return;
         el.addEventListener('change', function () {
@@ -1555,8 +1520,6 @@
         });
       });
 
-      // Read a CSV straight off the presenting machine. Korean files exported
-      // from Excel are often CP949, so fall back when UTF-8 decoding fails.
       if (fileEl) {
         fileEl.addEventListener('change', function () {
           var f = fileEl.files && fileEl.files[0];
@@ -1580,6 +1543,12 @@
         });
       }
 
+      var rt = null;
+      window.addEventListener('resize', function () {
+        clearTimeout(rt);
+        rt = setTimeout(function () { layout(); spawnBalls(); }, 150);
+      });
+
       // ---------- init ----------
       var seedText = basePool.map(function (e) { return e.n + ',' + e.d; }).join('\n');
       try {
@@ -1593,13 +1562,12 @@
         }
       } catch (err) {}
       namesBox.value = seedText;
+      layout();
       var seeded = loadRoster(seedText, false);
       if (seeded.length >= 2) { basePool = seeded; pool = basePool.slice(); }
-      updateCard();
-      buildBezel();
       prepareRound();
-      draw();
       renderWinners();
+      requestAnimationFrame(frame);
     })();
 
     render();
