@@ -2242,7 +2242,8 @@
     // The same fairness rules as the drum. Every entrant is a marble in the
     // start box, numbered, in a shuffled order; the code never picks one.
     // On 레이스 시작 the floor opens and the whole field falls down a course
-    // of pins, ramps, spinning paddles, bumpers and a funnel; the camera
+    // of pins, pop bumpers, ramps with a swing gate, spinning wheels, moving
+    // shelves, split lanes, a funnel with a turnstile; the camera
     // follows the leaders and zooms in for the finish. The first marble
     // across the goal line has won. Nothing steers a marble.
     (function () {
@@ -2284,7 +2285,7 @@
       var phaseStart = 0, gateOpen = false, ejected = null, holeAt = 0;
       var W = 0, H = 0, DPR = 1, PX = 1, viewH = 30;
       var BR = 0.25, passes = 2, substeps = 2, grid = {}, cell = 0;
-      var segs = [], circles = [], paddles = [], bands = {};
+      var segs = [], circles = [], movers = [], bands = {};
       var cam = { x: WW / 2, y: 15, z: 1, tx: WW / 2, ty: 15, tz: 1 };
       var courseLayer = null, miniLayer = null, CPX = 1, MINI = { w: 44, h: 0, x: 0, y: 12, s: 1 };
       var plainSprites = [];
@@ -2367,52 +2368,73 @@
         });
         for (var i = 0; i < 4; i++) {
           var a = pts[i], b = pts[(i + 1) % 4];
-          segs.push(seg(a[0], a[1], b[0], b[1], e));
+          var sg = seg(a[0], a[1], b[0], b[1], e); sg.box = true;
+          segs.push(sg);
         }
         boxes.push({ x: cx, y: cy, w: w, h: h, rot: rot });
       }
       var boxes = [];
 
       function buildCourse() {
-        segs = []; circles = []; paddles = []; boxes = [];
+        segs = []; circles = []; movers = []; boxes = [];
         var i, r, c, x, y;
-        // A · pin field
-        for (r = 0; r < 9; r++) {
+        // A · pin field with three pop bumpers that kick a marble away hard
+        var kick = [[5, 19], [13, 19], [21, 19]];
+        for (r = 0; r < 8; r++) {
           y = 12 + r * 1.7;
           for (c = 0; c < 14; c++) {
             x = 1.4 + c * 1.8 + (r % 2) * 0.9;
             if (x > WW - 1) continue;
-            circles.push({ x: x, y: y, r: 0.22, e: 0.5 });
+            var nearKick = false;
+            for (i = 0; i < kick.length; i++) if (Math.abs(x - kick[i][0]) < 1.3 && Math.abs(y - kick[i][1]) < 1.3) nearKick = true;
+            if (!nearKick) circles.push({ x: x, y: y, r: 0.22, e: 0.5 });
           }
         }
-        // B · zigzag ramps, each with a gap at its low end
-        var rampY = 30;
-        for (i = 0; i < 4; i++) {
+        kick.forEach(function (k) { circles.push({ x: k[0], y: k[1], r: 0.55, e: 0.6, kick: 13 }); });
+        // B · zigzag ramps; the second one ends in a swing gate that holds a
+        //     group on the ramp, then drops them all at once
+        var rampY = 27.5;
+        for (i = 0; i < 3; i++) {
           var toRight = i % 2 === 0;
           if (toRight) addBox(9.5, rampY + 1.2, 19.5, 0.35, 0.17, 0.2);
           else addBox(WW - 9.5, rampY + 1.2, 19.5, 0.35, -0.17, 0.2);
-          rampY += 4.2;
+          // the gate hinges at the wall and drops like a trapdoor, so when
+          // open it hangs by the wall and nothing below is walled off; the
+          // next ramp sits a little lower so the closing bar lifts nothing
+          if (i === 1) movers.push({ kind: 'gate', x: 0.3, y: rampY + 2.95, len: 6.7, w: 0.3,
+                                     period: 4.2, closed: 0, open: 1.35, a: 0, om: 0 });
+          rampY += i === 1 ? 6.4 : 4.6;
         }
-        // C · spinning paddles
-        [[5, 51.5, 1.2], [13, 50.5, -1.5], [21, 51.5, 1.2]].forEach(function (p) {
-          paddles.push({ x: p[0], y: p[1], len: 2.4, w: 0.3, om: p[2], a: 0 });
+        // C · a big slow wheel between two fast ones, then two shelves that
+        //     slide back and forth and throw whatever lands on them
+        movers.push({ kind: 'paddle', x: 13, y: 46.5, len: 4.6, w: 0.32, om: 0.75, bars: 3, a: 0 });
+        movers.push({ kind: 'paddle', x: 3.6, y: 44.5, len: 2.2, w: 0.3, om: -1.7, bars: 2, a: 0.4 });
+        movers.push({ kind: 'paddle', x: WW - 3.6, y: 44.5, len: 2.2, w: 0.3, om: 1.7, bars: 2, a: 0.9 });
+        movers.push({ kind: 'slider', x: 7, y: 53.5, len: 5, w: 0.35, amp: 3.6, period: 3.1, ph: 0, sx: 7, vx: 0 });
+        movers.push({ kind: 'slider', x: 19, y: 53.5, len: 5, w: 0.35, amp: 3.6, period: 3.7, ph: 2.1, sx: 19, vx: 0 });
+        // D · the course splits: pop bumpers on the left, diamonds on the right
+        var dv = seg(13, 56.5, 13, 66.5, 0.2); segs.push(dv);
+        circles.push({ x: 4, y: 58.5, r: 0.55, e: 0.6, kick: 12 });
+        circles.push({ x: 9.2, y: 61.5, r: 0.55, e: 0.6, kick: 12 });
+        circles.push({ x: 4, y: 64.5, r: 0.55, e: 0.6, kick: 12 });
+        [[16, 58.5], [22.5, 58.5], [19.2, 61.5], [16, 64.5], [22.5, 64.5]].forEach(function (d) {
+          addBox(d[0], d[1], 0.9, 0.9, Math.PI / 4, 0.85);
         });
-        circles.push({ x: 9, y: 55, r: 0.35, e: 0.6 }); circles.push({ x: 17, y: 55, r: 0.35, e: 0.6 });
-        // D · bumper diamonds
-        for (r = 0; r < 6; r++) {
-          y = 60 + r * 3;
+        // E · bumper field
+        for (r = 0; r < 3; r++) {
+          y = 69.5 + r * 3;
           for (c = 0; c < 8; c++) {
             x = 2.5 + c * 3 + (r % 2) * 1.5;
             if (x > WW - 1.5) continue;
             addBox(x, y, 0.9, 0.9, Math.PI / 4, 0.85);
           }
         }
-        // E · funnel to a 4-unit throat, with a few pins to keep it flowing
+        // F · funnel to a 4-unit throat, with a turnstile just above it
         segs.push(seg(0, 80, 11, 94, 0.2)); segs.push(seg(WW, 80, WW - 11, 94, 0.2));
         segs.push(seg(11, 94, 11, 97, 0.2)); segs.push(seg(WW - 11, 94, WW - 11, 97, 0.2));
         circles.push({ x: 8, y: 86, r: 0.3, e: 0.5 }); circles.push({ x: 18, y: 86, r: 0.3, e: 0.5 });
-        circles.push({ x: 13, y: 90, r: 0.3, e: 0.5 });
-        // F · home straight: a last pin screen, then the goal line
+        movers.push({ kind: 'paddle', x: 13, y: 89.8, len: 1.7, w: 0.26, om: 1.6, bars: 2, a: 0 });
+        // G · home straight: a last pin screen, then the goal line
         for (r = 0; r < 3; r++) {
           y = 99.5 + r * 1.8;
           for (c = 0; c < 12; c++) {
@@ -2461,22 +2483,55 @@
         b.x = o.x + nx * mind; b.y = o.y + ny * mind;
         var vn = b.vx * nx + b.vy * ny;
         if (vn < 0) { b.vx -= (1 + o.e) * vn * nx; b.vy -= (1 + o.e) * vn * ny; }
+        // a pop bumper kicks: it sends the marble off at full speed whatever
+        // speed it arrived with
+        if (o.kick) {
+          var vk = b.vx * nx + b.vy * ny;
+          if (vk < o.kick) { b.vx += (o.kick - vk) * nx; b.vy += (o.kick - vk) * ny; }
+        }
       }
 
-      // a paddle is two crossed bars turning about a hub; on contact the bar's
-      // own surface speed is what the marble bounces off
-      function hitPaddle(b, p) {
-        var dx = b.x - p.x, dy = b.y - p.y;
-        if (dx * dx + dy * dy > (p.len + b.r + 0.5) * (p.len + b.r + 0.5)) return;
-        for (var k = 0; k < 2; k++) {
-          var a = p.a + k * Math.PI / 2, c = Math.cos(a), s = Math.sin(a);
-          var sg = seg(p.x - c * p.len, p.y - s * p.len, p.x + c * p.len, p.y + s * p.len, 0.5);
-          // surface velocity at the marble's spot: omega x radius vector
-          var vsx = -p.om * (b.y - p.y), vsy = p.om * (b.x - p.x);
-          hitSeg(b, sg, vsx, vsy);
-          // the bar has width: also test as a slightly thicker segment
+      // Movers are the course's kinematic parts. On contact the part's own
+      // surface speed is what the marble bounces off, so a wheel flings and a
+      // shelf carries.
+      function moverPose(m, t) {
+        if (m.kind === 'gate') {
+          // closed most of the cycle, then a quick swing open, a pause, and back
+          var u = ((t / 1000) / m.period) % 1, k;
+          if (u < 0.55) { m.a = m.closed; m.om = 0; }
+          else if (u < 0.7) { k = (u - 0.55) / 0.15; m.a = m.closed + (m.open - m.closed) * k * k * (3 - 2 * k); m.om = (m.open - m.closed) * 6 * k * (1 - k) / (0.15 * m.period); }
+          else if (u < 0.85) { m.a = m.open; m.om = 0; }
+          else { k = (u - 0.85) / 0.15; m.a = m.open + (m.closed - m.open) * k * k * (3 - 2 * k); m.om = (m.closed - m.open) * 6 * k * (1 - k) / (0.15 * m.period); }
+        } else if (m.kind === 'slider') {
+          var w = 6.2832 / m.period, ph = w * t / 1000 + m.ph;
+          m.sx = m.x + m.amp * Math.sin(ph);
+          m.vx = m.amp * w * Math.cos(ph);
         }
-        hitCircle(b, { x: p.x, y: p.y, r: 0.45, e: 0.4 });
+      }
+
+      function hitMover(b, m) {
+        var dx = b.x - m.x, dy = b.y - m.y, reach = (m.amp || m.len) + m.len + b.r + 0.6;
+        if (dx * dx + dy * dy > reach * reach) return;
+        var k, a, c, sn, sg;
+        if (m.kind === 'paddle') {
+          for (k = 0; k < m.bars; k++) {
+            a = m.a + k * Math.PI / m.bars; c = Math.cos(a); sn = Math.sin(a);
+            sg = seg(m.x - c * m.len, m.y - sn * m.len, m.x + c * m.len, m.y + sn * m.len, 0.5);
+            hitSeg(b, sg, -m.om * (b.y - m.y), m.om * (b.x - m.x));
+          }
+          hitCircle(b, { x: m.x, y: m.y, r: 0.45, e: 0.4 });
+        } else if (m.kind === 'gate') {
+          c = Math.cos(m.a); sn = Math.sin(m.a);
+          sg = seg(m.x, m.y, m.x + c * m.len, m.y + sn * m.len, 0.3);
+          hitSeg(b, sg, -m.om * (b.y - m.y), m.om * (b.x - m.x));
+        } else if (m.kind === 'slider') {
+          sg = seg(m.sx - m.len / 2, m.y, m.sx + m.len / 2, m.y, 0.3);
+          hitSeg(b, sg, m.vx, 0);
+          // riding on the shelf: friction drags the marble along with it
+          if (Math.abs(b.x - m.sx) < m.len / 2 + b.r && b.y < m.y && m.y - b.y < b.r + TH + 0.08) {
+            b.vx += (m.vx - b.vx) * 0.2;
+          }
+        }
       }
 
       function buildGrid() {
@@ -2525,7 +2580,7 @@
       }
 
       // Side walls, the start-box floor while closed, every static in the
-      // marble's band, the paddles, and the goal line. The first marble whose
+      // marble's band, the movers, and the goal line. The first marble whose
       // centre crosses the goal has won; that is the whole rule.
       function clampStatics() {
         for (var i = 0; i < balls.length; i++) {
@@ -2545,7 +2600,7 @@
             var cs = bands['c' + k];
             if (cs) for (var u = 0; u < cs.length; u++) hitCircle(b, cs[u]);
           }
-          for (var pd = 0; pd < paddles.length; pd++) hitPaddle(b, paddles[pd]);
+          for (var pd = 0; pd < movers.length; pd++) hitMover(b, movers[pd]);
           if (b.y > GOAL_Y && phase === 'race') { capture(b); continue; }
           if (b.y > END_Y) b.done = true;
         }
@@ -2584,7 +2639,10 @@
             if (sp > VMAX) { b.vx = b.vx / sp * VMAX; b.vy = b.vy / sp * VMAX; }
             b.x += b.vx * h; b.y += b.vy * h;
           }
-          for (var pd = 0; pd < paddles.length; pd++) paddles[pd].a += paddles[pd].om * h;
+          for (var pd = 0; pd < movers.length; pd++) {
+            var mv = movers[pd];
+            if (mv.kind === 'paddle') mv.a += mv.om * h; else moverPose(mv, now + (sub + 1) * h * 1000);
+          }
           for (var it = 0; it < passes; it++) { resolvePairs(); clampStatics(); }
         }
       }
@@ -2609,9 +2667,14 @@
         // pins
         circles.forEach(function (o) {
           g.beginPath(); g.arc(o.x, o.y, o.r, 0, 6.2832);
-          g.fillStyle = o.e > 0.55 ? 'rgba(255,227,154,.9)' : 'rgba(200,228,255,.85)';
-          g.shadowColor = o.e > 0.55 ? 'rgba(255,215,120,.9)' : 'rgba(120,190,255,.9)'; g.shadowBlur = o.r * 6 * CPX * 0.3;
+          g.fillStyle = o.kick ? 'rgba(255,179,199,.95)' : o.e > 0.55 ? 'rgba(255,227,154,.9)' : 'rgba(200,228,255,.85)';
+          g.shadowColor = o.kick ? 'rgba(255,120,170,.95)' : o.e > 0.55 ? 'rgba(255,215,120,.9)' : 'rgba(120,190,255,.9)';
+          g.shadowBlur = o.r * 6 * CPX * 0.3;
           g.fill();
+          if (o.kick) {                              // a pop bumper wears a ring
+            g.beginPath(); g.arc(o.x, o.y, o.r + 0.25, 0, 6.2832);
+            g.lineWidth = 0.08; g.strokeStyle = 'rgba(255,179,199,.7)'; g.stroke();
+          }
         });
         g.shadowBlur = 0;
         // boxes: ramps and bumpers
@@ -2626,13 +2689,13 @@
         // funnel and throat walls
         g.strokeStyle = 'rgba(175,215,255,.6)'; g.lineWidth = 0.18; g.lineCap = 'round';
         segs.forEach(function (s) {
-          if (s.e !== 0.2) return;
-          if (Math.abs(s.dx) > 5 && Math.abs(s.dy) < 6 && s.ay !== s.by) { /* ramps drawn as boxes */ }
-          if (s.miny >= 79) { g.beginPath(); g.moveTo(s.ax, s.ay); g.lineTo(s.bx, s.by); g.stroke(); }
+          if (s.box) return;                         // ramps and bumpers are drawn as boxes
+          g.beginPath(); g.moveTo(s.ax, s.ay); g.lineTo(s.bx, s.by); g.stroke();
         });
-        // paddle hubs
-        paddles.forEach(function (p) {
-          g.beginPath(); g.arc(p.x, p.y, 0.45, 0, 6.2832);
+        // hubs and pivots
+        movers.forEach(function (m) {
+          if (m.kind === 'slider') return;
+          g.beginPath(); g.arc(m.x, m.y, m.kind === 'gate' ? 0.35 : 0.45, 0, 6.2832);
           g.fillStyle = 'rgba(255,227,154,.9)'; g.fill();
         });
         // goal
@@ -2686,13 +2749,27 @@
           ctx.strokeStyle = 'rgba(255,227,154,.6)'; ctx.lineWidth = 0.12;
           ctx.beginPath(); ctx.moveTo(0, HOPPER_Y); ctx.lineTo(WW, HOPPER_Y); ctx.stroke();
         }
-        // paddles
-        paddles.forEach(function (p) {
-          if (p.y < top || p.y > bot) return;
-          ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a);
-          ctx.fillStyle = 'rgba(255,227,154,.85)';
-          ctx.fillRect(-p.len, -p.w / 2, p.len * 2, p.w);
-          ctx.fillRect(-p.w / 2, -p.len, p.w, p.len * 2);
+        // movers
+        movers.forEach(function (m) {
+          if (m.y < top - 6 || m.y > bot + 6) return;
+          ctx.save();
+          if (m.kind === 'paddle') {
+            ctx.translate(m.x, m.y); ctx.rotate(m.a);
+            ctx.fillStyle = 'rgba(255,227,154,.85)';
+            for (var k = 0; k < m.bars; k++) {
+              ctx.fillRect(-m.len, -m.w / 2, m.len * 2, m.w);
+              ctx.rotate(Math.PI / m.bars);
+            }
+          } else if (m.kind === 'gate') {
+            ctx.translate(m.x, m.y); ctx.rotate(m.a);
+            ctx.fillStyle = m.om === 0 && m.a === m.closed ? 'rgba(255,179,199,.9)' : 'rgba(255,227,154,.85)';
+            ctx.fillRect(0, -m.w / 2, m.len, m.w);
+          } else if (m.kind === 'slider') {
+            ctx.fillStyle = 'rgba(127,216,232,.85)';
+            ctx.fillRect(m.sx - m.len / 2, m.y - m.w / 2, m.len, m.w);
+            ctx.fillStyle = 'rgba(3,11,26,.6)';
+            for (var q = -1; q <= 1; q++) ctx.fillRect(m.sx + q * 1.2 - 0.08, m.y - m.w / 2 + 0.06, 0.16, m.w - 0.12);
+          }
           ctx.restore();
         });
         // marbles; names appear once a marble is big enough on screen
