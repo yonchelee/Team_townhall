@@ -299,6 +299,9 @@
   .drum-wrap--pin { aspect-ratio:3/4; }
   .drum-wrap--pin .drum-glow { inset:2% 8% 6%; border-radius:18%; }
   .drum-wrap--pin .winner-big { top:52%; }
+  /* the race board is a narrow portrait, so the finisher's name is sized to it */
+  .drum-wrap--pin .wb-name { font-size:clamp(30px,4.6vw,86px); }
+  .drum-wrap--pin .wb-dept { font-size:clamp(14px,1.5vw,26px); }
   /* the glow hugs the drum, which sits high-left of centre to leave room for the tube */
   .drum-glow { position:absolute; inset:5.5% 10.5% 15.5%; border-radius:50%; pointer-events:none;
     background:radial-gradient(circle, rgba(70,150,255,.34) 0%,
@@ -2266,13 +2269,13 @@
       var STORE = 'luckydraw.roster';    // shared with the drum: one roster serves both games
       var MIX_MS = 2500;                 // shaking before the floor opens
       var RANKS = 5;                     // places listed after the first is home
-      var RACE_TAIL_MS = 25000;          // the race ends this long after first place at the latest
+      var RACE_TAIL_MS = 60000;          // the race ends this long after first place at the latest
       var ranks = [], firstAt = 0;
 
       // The course is laid out in world units; the canvas is a camera on it.
       var WW = 26;                       // course width
       var HOPPER_Y = 9;                  // start-box floor
-      var GOAL_Y = 108, END_Y = 115, COURSE_H = 117;
+      var GOAL_Y = 324, END_Y = 333, COURSE_H = 336;   // set by buildCourse
 
       var basePool = [
         { n: '참가자 1', d: '기구개발팀' }, { n: '참가자 2', d: '기구개발팀' },
@@ -2287,7 +2290,7 @@
       var BR = 0.25, passes = 2, substeps = 2, grid = {}, cell = 0;
       var segs = [], circles = [], movers = [], bands = {};
       var cam = { x: WW / 2, y: 15, z: 1, tx: WW / 2, ty: 15, tz: 1 };
-      var courseLayer = null, miniLayer = null, CPX = 1, MINI = { w: 44, h: 0, x: 0, y: 12, s: 1 };
+      var miniLayer = null, MINI = { w: 44, h: 0, x: 0, y: 12, s: 1 }, NOZZLES = [];
       var plainSprites = [];
 
       var PALETTE = [
@@ -2302,18 +2305,31 @@
         geometry(Math.max(180, Math.round(box.width)), Math.max(240, Math.round(box.height)));
         cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
         ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-        bakeCourse();
       }
 
       function geometry(w, h) {
         W = w; H = h;
         PX = W / WW;                     // pixels per unit at zoom 1
         viewH = H / PX;
-        MINI.s = (H * 0.24) / COURSE_H;
-        MINI.w = WW * MINI.s; MINI.h = COURSE_H * MINI.s;
-        MINI.x = W - MINI.w - 10; MINI.y = 12;
+        buildNozzles();
         sizeBalls();
         buildCourse();
+        // the course is a tall ribbon now, so the minimap is too
+        MINI.h = H * 0.52; MINI.s = MINI.h / COURSE_H; MINI.w = WW * MINI.s;
+        MINI.x = W - MINI.w - 10; MINI.y = 12;
+        bakeMini();
+      }
+
+      // air comes up through a row of nozzles in the box floor, each one
+      // breathing on its own, so the pile boils from several places at once
+      function buildNozzles() {
+        NOZZLES = [];
+        var n = 6;
+        for (var i = 0; i < n; i++) {
+          NOZZLES.push({ x: WW * (i + 0.5) / n,
+                         ph: i * 1.7,                 // fixed offsets: same mix every time
+                         sp: 0.006 + (i % 3) * 0.004 });
+        }
       }
 
       // ---------- balls ----------
@@ -2375,74 +2391,142 @@
       }
       var boxes = [];
 
+      // ---- course sections; each takes the y it starts at and returns the
+      // y the next one starts at, so the course is assembled down the page
+      function secPins(y, rows, kicks) {
+        kicks = kicks || [];
+        var ky = y + Math.floor(rows / 2) * 1.7;
+        for (var r = 0; r < rows; r++) {
+          var yy = y + r * 1.7;
+          for (var c = 0; c < 14; c++) {
+            var x = 1.4 + c * 1.8 + (r % 2) * 0.9;
+            if (x > WW - 1) continue;
+            var near = false;
+            for (var k = 0; k < kicks.length; k++) {
+              if (Math.abs(x - kicks[k]) < 1.3 && Math.abs(yy - ky) < 1.3) near = true;
+            }
+            if (!near) circles.push({ x: x, y: yy, r: 0.22, e: 0.38 });
+          }
+        }
+        kicks.forEach(function (kx) { circles.push({ x: kx, y: ky, r: 0.55, e: 0.6, kick: 13 }); });
+        return y + rows * 1.7 + 1.5;
+      }
+
+      // zigzag ramps; one of them ends in a trapdoor hinged at the wall the
+      // ramp runs down to, which holds a group and drops them all at once
+      function secRamps(y, n, gateIdx, mirror) {
+        var ry = y;
+        for (var i = 0; i < n; i++) {
+          var descRight = ((i % 2 === 0) !== !!mirror);
+          if (descRight) addBox(9, ry + 1.2, 17, 0.35, 0.3, 0.15);
+          else addBox(WW - 9, ry + 1.2, 17, 0.35, -0.3, 0.15);
+          if (i === gateIdx) {
+            if (descRight) movers.push({ kind: 'gate', x: WW - 0.3, y: ry + 4.4, len: 6.7, w: 0.3,
+                                         period: 4.2, closed: Math.PI, open: Math.PI - 1.35, a: Math.PI, om: 0 });
+            else movers.push({ kind: 'gate', x: 0.3, y: ry + 4.4, len: 6.7, w: 0.3,
+                               period: 4.2, closed: 0, open: 1.35, a: 0, om: 0 });
+            ry += 8.8;
+          } else ry += 6.8;
+        }
+        return ry + 1;
+      }
+
+      function secWheels(y, big) {
+        movers.push({ kind: 'paddle', x: 13, y: y + 3.5, len: big ? 4.6 : 3.6, w: 0.32,
+                      om: big ? 0.75 : -1.05, bars: big ? 3 : 2, a: 0 });
+        movers.push({ kind: 'paddle', x: 3.6, y: y + 1.5, len: 2.2, w: 0.3, om: -1.7, bars: 2, a: 0.4 });
+        movers.push({ kind: 'paddle', x: WW - 3.6, y: y + 1.5, len: 2.2, w: 0.3, om: 1.7, bars: 2, a: 0.9 });
+        return y + 9;
+      }
+
+      function secSliders(y, ph) {
+        movers.push({ kind: 'slider', x: 7, y: y + 2, len: 5, w: 0.35, amp: 3.6, period: 3.1, ph: ph, sx: 7, vx: 0 });
+        movers.push({ kind: 'slider', x: 19, y: y + 2, len: 5, w: 0.35, amp: 3.6, period: 3.7, ph: ph + 2.1, sx: 19, vx: 0 });
+        return y + 6;
+      }
+
+      // the course splits in two: pop bumpers down one lane, diamonds the other
+      function secSplit(y, kickLeft) {
+        segs.push(seg(13, y, 13, y + 10, 0.2));
+        var kx = kickLeft ? [4, 9.2, 4] : [22, 16.8, 22];
+        var dx = kickLeft ? [16, 22.5, 19.2, 16, 22.5] : [4, 10.5, 7.2, 4, 10.5];
+        circles.push({ x: kx[0], y: y + 2, r: 0.55, e: 0.6, kick: 12 });
+        circles.push({ x: kx[1], y: y + 5, r: 0.55, e: 0.6, kick: 12 });
+        circles.push({ x: kx[2], y: y + 8, r: 0.55, e: 0.6, kick: 12 });
+        [[dx[0], y + 2], [dx[1], y + 2], [dx[2], y + 5], [dx[3], y + 8], [dx[4], y + 8]].forEach(function (d) {
+          addBox(d[0], d[1], 0.9, 0.9, Math.PI / 4, 0.62);
+        });
+        return y + 12;
+      }
+
+      function secDiamonds(y, rows) {
+        for (var r = 0; r < rows; r++) {
+          var yy = y + r * 3;
+          for (var c = 0; c < 8; c++) {
+            var x = 2.5 + c * 3 + (r % 2) * 1.5;
+            if (x > WW - 1.5) continue;
+            addBox(x, yy, 0.9, 0.9, Math.PI / 4, 0.62);
+          }
+        }
+        return y + rows * 3 + 1;
+      }
+
+      // a funnel down to a four-unit throat, with a turnstile above it
+      function secFunnel(y, turnstile) {
+        segs.push(seg(0, y, 11, y + 14, 0.2)); segs.push(seg(WW, y, WW - 11, y + 14, 0.2));
+        segs.push(seg(11, y + 14, 11, y + 17, 0.2)); segs.push(seg(WW - 11, y + 14, WW - 11, y + 17, 0.2));
+        circles.push({ x: 8, y: y + 6, r: 0.3, e: 0.38 }); circles.push({ x: 18, y: y + 6, r: 0.3, e: 0.38 });
+        if (turnstile) movers.push({ kind: 'paddle', x: 13, y: y + 9.8, len: 1.7, w: 0.26, om: 1.6, bars: 2, a: 0 });
+        return y + 19;
+      }
+
       function buildCourse() {
         segs = []; circles = []; movers = []; boxes = [];
-        var i, r, c, x, y;
-        // A · pin field with three pop bumpers that kick a marble away hard
-        var kick = [[5, 19], [13, 19], [21, 19]];
-        for (r = 0; r < 8; r++) {
-          y = 12 + r * 1.7;
-          for (c = 0; c < 14; c++) {
-            x = 1.4 + c * 1.8 + (r % 2) * 0.9;
+        var y = 12;
+        // four laps of the same kinds of obstacle, each laid out differently
+        for (var cyc = 0; cyc < 4; cyc++) {
+          y = secPins(y, cyc === 0 ? 8 : 5, cyc % 2 === 0 ? [5, 13, 21] : [9, 17]);
+          y = secRamps(y, 2, 1, cyc % 2 === 1);
+          y = secWheels(y, cyc % 2 === 0);
+          y = secSliders(y, cyc * 1.3);
+          y = secSplit(y, cyc % 2 === 0);
+          y = secDiamonds(y, cyc === 3 ? 2 : 3);
+          y = secPins(y, 4, cyc % 2 === 0 ? [9, 17] : [5, 13, 21]);
+          if (cyc === 1) y = secWheels(y, false);
+        }
+        // the last funnel, then the home straight and the goal line
+        y = secFunnel(y, true);
+        for (var r = 0; r < 3; r++) {
+          var hy = y + 3 + r * 1.8;
+          for (var c = 0; c < 12; c++) {
+            var x = 1.5 + c * 2.1 + (r % 2) * 1.05;
             if (x > WW - 1) continue;
-            var nearKick = false;
-            for (i = 0; i < kick.length; i++) if (Math.abs(x - kick[i][0]) < 1.3 && Math.abs(y - kick[i][1]) < 1.3) nearKick = true;
-            if (!nearKick) circles.push({ x: x, y: y, r: 0.22, e: 0.5 });
+            circles.push({ x: x, y: hy, r: 0.22, e: 0.38 });
           }
         }
-        kick.forEach(function (k) { circles.push({ x: k[0], y: k[1], r: 0.55, e: 0.6, kick: 13 }); });
-        // B · zigzag ramps; the second one ends in a swing gate that holds a
-        //     group on the ramp, then drops them all at once
-        var rampY = 27.5;
-        for (i = 0; i < 3; i++) {
-          var toRight = i % 2 === 0;
-          if (toRight) addBox(9.5, rampY + 1.2, 19.5, 0.35, 0.17, 0.2);
-          else addBox(WW - 9.5, rampY + 1.2, 19.5, 0.35, -0.17, 0.2);
-          // the gate hinges at the wall and drops like a trapdoor, so when
-          // open it hangs by the wall and nothing below is walled off; the
-          // next ramp sits a little lower so the closing bar lifts nothing
-          if (i === 1) movers.push({ kind: 'gate', x: 0.3, y: rampY + 2.95, len: 6.7, w: 0.3,
-                                     period: 4.2, closed: 0, open: 1.35, a: 0, om: 0 });
-          rampY += i === 1 ? 6.4 : 4.6;
+        GOAL_Y = y + 13; END_Y = GOAL_Y + 9; COURSE_H = END_Y + 3;
+        // A pin or bumper sitting against a sloping wall makes a notch a
+        // marble can wedge into for good, so clear a lane beside every wall.
+        var walls = segs.filter(function (sg) { return !sg.box; });
+        function distToSeg(px, py, sg) {
+          var t2 = ((px - sg.ax) * sg.dx + (py - sg.ay) * sg.dy) / sg.l2;
+          t2 = t2 < 0 ? 0 : t2 > 1 ? 1 : t2;
+          return Math.sqrt(Math.pow(px - (sg.ax + sg.dx * t2), 2) + Math.pow(py - (sg.ay + sg.dy * t2), 2));
         }
-        // C · a big slow wheel between two fast ones, then two shelves that
-        //     slide back and forth and throw whatever lands on them
-        movers.push({ kind: 'paddle', x: 13, y: 46.5, len: 4.6, w: 0.32, om: 0.75, bars: 3, a: 0 });
-        movers.push({ kind: 'paddle', x: 3.6, y: 44.5, len: 2.2, w: 0.3, om: -1.7, bars: 2, a: 0.4 });
-        movers.push({ kind: 'paddle', x: WW - 3.6, y: 44.5, len: 2.2, w: 0.3, om: 1.7, bars: 2, a: 0.9 });
-        movers.push({ kind: 'slider', x: 7, y: 53.5, len: 5, w: 0.35, amp: 3.6, period: 3.1, ph: 0, sx: 7, vx: 0 });
-        movers.push({ kind: 'slider', x: 19, y: 53.5, len: 5, w: 0.35, amp: 3.6, period: 3.7, ph: 2.1, sx: 19, vx: 0 });
-        // D · the course splits: pop bumpers on the left, diamonds on the right
-        var dv = seg(13, 56.5, 13, 66.5, 0.2); segs.push(dv);
-        circles.push({ x: 4, y: 58.5, r: 0.55, e: 0.6, kick: 12 });
-        circles.push({ x: 9.2, y: 61.5, r: 0.55, e: 0.6, kick: 12 });
-        circles.push({ x: 4, y: 64.5, r: 0.55, e: 0.6, kick: 12 });
-        [[16, 58.5], [22.5, 58.5], [19.2, 61.5], [16, 64.5], [22.5, 64.5]].forEach(function (d) {
-          addBox(d[0], d[1], 0.9, 0.9, Math.PI / 4, 0.85);
+        function clearOf(px, py, gap) {
+          for (var wi = 0; wi < walls.length; wi++) if (distToSeg(px, py, walls[wi]) < gap) return false;
+          return true;
+        }
+        circles = circles.filter(function (o) { return clearOf(o.x, o.y, o.r + 1.1); });
+        var kept = [];
+        boxes = boxes.filter(function (bx) { return clearOf(bx.x, bx.y, 1.6); });
+        segs = segs.filter(function (sg) {
+          if (!sg.box) return true;
+          return boxes.some(function (bx) {
+            return Math.abs(sg.minx - bx.x) < bx.w && Math.abs(sg.miny - bx.y) < bx.w;
+          });
         });
-        // E · bumper field
-        for (r = 0; r < 3; r++) {
-          y = 69.5 + r * 3;
-          for (c = 0; c < 8; c++) {
-            x = 2.5 + c * 3 + (r % 2) * 1.5;
-            if (x > WW - 1.5) continue;
-            addBox(x, y, 0.9, 0.9, Math.PI / 4, 0.85);
-          }
-        }
-        // F · funnel to a 4-unit throat, with a turnstile just above it
-        segs.push(seg(0, 80, 11, 94, 0.2)); segs.push(seg(WW, 80, WW - 11, 94, 0.2));
-        segs.push(seg(11, 94, 11, 97, 0.2)); segs.push(seg(WW - 11, 94, WW - 11, 97, 0.2));
-        circles.push({ x: 8, y: 86, r: 0.3, e: 0.5 }); circles.push({ x: 18, y: 86, r: 0.3, e: 0.5 });
-        movers.push({ kind: 'paddle', x: 13, y: 89.8, len: 1.7, w: 0.26, om: 1.6, bars: 2, a: 0 });
-        // G · home straight: a last pin screen, then the goal line
-        for (r = 0; r < 3; r++) {
-          y = 99.5 + r * 1.8;
-          for (c = 0; c < 12; c++) {
-            x = 1.5 + c * 2.1 + (r % 2) * 1.05;
-            if (x > WW - 1) continue;
-            circles.push({ x: x, y: y, r: 0.22, e: 0.5 });
-          }
-        }
+
         // spatial bands so a marble only tests nearby statics
         bands = {};
         function reg(k, lo, hi, item) {
@@ -2479,7 +2563,10 @@
         var ddx = b.x - o.x, ddy = b.y - o.y, mind = b.r + o.r;
         var d2 = ddx * ddx + ddy * ddy;
         if (d2 >= mind * mind) return;
-        var d = Math.sqrt(d2) || 0.0001, nx = ddx / d, ny = ddy / d;
+        // dead centre on a pin: pick a direction, or the marble is snapped to
+        // the pin's centre for good and sits there forever
+        if (d2 < 1e-8) { var ra = Math.random() * 6.2832; ddx = Math.cos(ra); ddy = Math.sin(ra); d2 = 1; }
+        var d = Math.sqrt(d2), nx = ddx / d, ny = ddy / d;
         b.x = o.x + nx * mind; b.y = o.y + ny * mind;
         var vn = b.vx * nx + b.vy * ny;
         if (vn < 0) { b.vx -= (1 + o.e) * vn * nx; b.vy -= (1 + o.e) * vn * ny; }
@@ -2608,12 +2695,12 @@
 
       function step(dt, now) {
         var shaking = (phase === 'shake' || phase === 'mixing');
-        var G = 12, VMAX = 22;
-        // the start box is an air-mix chamber like the drum: a jet from a
-        // nozzle in the floor lifts the marbles up the middle, they spill to
-        // the sides and slide back along the coned floor into the jet
-        var JET = shaking ? 95 * (0.9 + 0.25 * Math.sin(now * 0.009) + 0.12 * Math.sin(now * 0.023)) : 0;
-        var rattle = (phase === 'race' && now - holeAt > 25000 && ((now - holeAt) % 4000) < 700);
+        var G = 19, VMAX = 30;
+        // the start box is an air-mix chamber: six nozzles along the floor,
+        // each breathing at its own rate, so plumes rise in several places at
+        // once and the pile keeps turning over instead of circulating one way
+        var JET = shaking ? 70 : 0;
+        var rattle = (phase === 'race' && now - holeAt > 100000 && ((now - holeAt) % 4000) < 700);
         var h = dt / substeps;
         for (var sub = 0; sub < substeps; sub++) {
           for (var i = 0; i < balls.length; i++) {
@@ -2623,13 +2710,21 @@
             b.vy += G * h;
             if (shaking && inBox) {
               var hh = (HOPPER_Y - b.y) / HOPPER_Y;                 // 0 at the floor, 1 at the top
-              var pw = WW * (0.10 + 0.45 * hh);                     // the plume widens as it rises
-              var ox = b.x - WW / 2;
-              var lift = JET * Math.exp(-(ox * ox) / (pw * pw)) * Math.max(0, 1.15 - hh);
-              b.vy -= lift * h;
-              b.vx += (ox / pw) * lift * 0.22 * h;
-              if (hh < 0.3) b.vx -= (ox > 0 ? 1 : -1) * 10 * h;    // coned floor feeds the nozzle
-              b.vx += (Math.random() - 0.5) * 30 * h; b.vy += (Math.random() - 0.5) * 30 * h;
+              var pw = WW * (0.045 + 0.09 * hh);                    // each plume widens as it rises
+              var lift = 0, drift = 0;
+              for (var nz = 0; nz < NOZZLES.length; nz++) {
+                var N = NOZZLES[nz];
+                var ox = b.x - N.x;
+                if (ox > pw * 2.5 || ox < -pw * 2.5) continue;
+                var str = JET * (0.5 + 0.5 * Math.sin(now * N.sp + N.ph));
+                var e2 = Math.exp(-(ox * ox) / (pw * pw)) * Math.max(0, 1.2 - hh);
+                lift += str * e2;
+                drift += (ox / pw) * str * e2 * 0.2;                // air spills sideways as it rises
+              }
+              b.vy -= lift * h; b.vx += drift * h;
+              if (b.x < 1.5) b.vx += 8 * h;                         // walls nudge marbles back in
+              if (b.x > WW - 1.5) b.vx -= 8 * h;
+              b.vx += (Math.random() - 0.5) * 34 * h; b.vy += (Math.random() - 0.5) * 34 * h;
             }
             if (inBox && !shaking && b.above) { b.vx *= 0.96; b.vy *= 0.96; }
             else b.vx += (Math.random() - 0.5) * 6 * h;
@@ -2648,69 +2743,98 @@
       }
 
       // ---------- drawing ----------
-      function bakeCourse() {
-        CPX = Math.min(PX * 2.4 * DPR, 40);
-        var c = document.createElement('canvas');
-        c.width = Math.ceil(WW * CPX); c.height = Math.ceil(COURSE_H * CPX);
-        var g = c.getContext('2d');
-        g.scale(CPX, CPX);
-        // lanes
-        var bg = g.createLinearGradient(0, 0, 0, COURSE_H);
-        bg.addColorStop(0, 'rgba(130,185,255,.10)');
-        bg.addColorStop(0.5, 'rgba(24,64,124,.16)');
-        bg.addColorStop(1, 'rgba(6,20,45,.32)');
-        g.fillStyle = bg; g.fillRect(0, 0, WW, COURSE_H);
-        g.strokeStyle = 'rgba(255,255,255,.05)'; g.lineWidth = 0.04;
-        for (var yy = 10; yy < COURSE_H; yy += 10) { g.beginPath(); g.moveTo(0, yy); g.lineTo(WW, yy); g.stroke(); }
-        // start box
-        g.fillStyle = 'rgba(8,24,52,.4)'; g.fillRect(0, 0, WW, HOPPER_Y);
-        // pins
-        circles.forEach(function (o) {
+      // The course is three hundred units long, so it is drawn live, band by
+      // band, instead of baked into one enormous canvas. Only what the camera
+      // can see is touched, which is a fraction of the marbles' cost.
+      function courseTint(y) {
+        var t = Math.max(0, Math.min(1, y / COURSE_H));
+        var a = [130, 185, 255, 0.10], b2 = [24, 64, 124, 0.16], c2 = [6, 20, 45, 0.32];
+        var p, q, k;
+        if (t < 0.5) { p = a; q = b2; k = t / 0.5; } else { p = b2; q = c2; k = (t - 0.5) / 0.5; }
+        return 'rgba(' + Math.round(p[0] + (q[0] - p[0]) * k) + ',' +
+                         Math.round(p[1] + (q[1] - p[1]) * k) + ',' +
+                         Math.round(p[2] + (q[2] - p[2]) * k) + ',' +
+                         (p[3] + (q[3] - p[3]) * k).toFixed(3) + ')';
+      }
+
+      function drawCourse(g, top, bot, mini) {
+        var y0 = Math.max(0, top), y1 = Math.min(COURSE_H, bot);
+        if (y1 <= y0) return;
+        var bg = g.createLinearGradient(0, y0, 0, y1);
+        bg.addColorStop(0, courseTint(y0)); bg.addColorStop(1, courseTint(y1));
+        g.fillStyle = bg; g.fillRect(0, y0, WW, y1 - y0);
+        if (!mini) {
+          g.strokeStyle = 'rgba(255,255,255,.05)'; g.lineWidth = 0.04;
+          for (var yy = Math.ceil(y0 / 10) * 10; yy < y1; yy += 10) {
+            g.beginPath(); g.moveTo(0, yy); g.lineTo(WW, yy); g.stroke();
+          }
+        }
+        if (y0 < HOPPER_Y) {
+          g.fillStyle = 'rgba(8,24,52,.4)';
+          g.fillRect(0, y0, WW, Math.min(HOPPER_Y, y1) - y0);
+        }
+        // funnel and lane walls
+        g.strokeStyle = 'rgba(175,215,255,.6)'; g.lineWidth = mini ? 0.3 : 0.18; g.lineCap = 'round';
+        for (var si = 0; si < segs.length; si++) {
+          var sg = segs[si];
+          if (sg.box || sg.maxy < y0 || sg.miny > y1) continue;
+          g.beginPath(); g.moveTo(sg.ax, sg.ay); g.lineTo(sg.bx, sg.by); g.stroke();
+        }
+        // ramps and bumpers
+        for (var bi = 0; bi < boxes.length; bi++) {
+          var bx = boxes[bi];
+          if (bx.y < y0 - 3.5 || bx.y > y1 + 3.5) continue;
+          g.save(); g.translate(bx.x, bx.y); g.rotate(bx.rot);
+          g.fillStyle = bx.w > 5 ? 'rgba(175,215,255,.55)' : 'rgba(127,216,232,.75)';
+          g.fillRect(-bx.w / 2, -bx.h / 2, bx.w, bx.h);
+          g.restore();
+        }
+        // pins and pop bumpers
+        for (var ci = 0; ci < circles.length; ci++) {
+          var o = circles[ci];
+          if (o.y < y0 - 1 || o.y > y1 + 1) continue;
+          if (!mini) {                               // a soft halo instead of a shadow blur
+            g.beginPath(); g.arc(o.x, o.y, o.r * 2.1, 0, 6.2832);
+            g.fillStyle = o.kick ? 'rgba(255,120,170,.2)' : 'rgba(120,190,255,.18)';
+            g.fill();
+          }
           g.beginPath(); g.arc(o.x, o.y, o.r, 0, 6.2832);
-          g.fillStyle = o.kick ? 'rgba(255,179,199,.95)' : o.e > 0.55 ? 'rgba(255,227,154,.9)' : 'rgba(200,228,255,.85)';
-          g.shadowColor = o.kick ? 'rgba(255,120,170,.95)' : o.e > 0.55 ? 'rgba(255,215,120,.9)' : 'rgba(120,190,255,.9)';
-          g.shadowBlur = o.r * 6 * CPX * 0.3;
+          g.fillStyle = o.kick ? 'rgba(255,179,199,.95)' : o.e > 0.55 ? 'rgba(255,227,154,.9)' : 'rgba(200,228,255,.9)';
           g.fill();
-          if (o.kick) {                              // a pop bumper wears a ring
+          if (o.kick && !mini) {
             g.beginPath(); g.arc(o.x, o.y, o.r + 0.25, 0, 6.2832);
             g.lineWidth = 0.08; g.strokeStyle = 'rgba(255,179,199,.7)'; g.stroke();
           }
-        });
-        g.shadowBlur = 0;
-        // boxes: ramps and bumpers
-        boxes.forEach(function (bx) {
-          g.save(); g.translate(bx.x, bx.y); g.rotate(bx.rot);
-          g.fillStyle = bx.w > 5 ? 'rgba(175,215,255,.55)' : 'rgba(127,216,232,.75)';
-          g.shadowColor = 'rgba(120,200,255,.8)'; g.shadowBlur = 0.4 * CPX;
-          g.fillRect(-bx.w / 2, -bx.h / 2, bx.w, bx.h);
-          g.restore();
-        });
-        g.shadowBlur = 0;
-        // funnel and throat walls
-        g.strokeStyle = 'rgba(175,215,255,.6)'; g.lineWidth = 0.18; g.lineCap = 'round';
-        segs.forEach(function (s) {
-          if (s.box) return;                         // ramps and bumpers are drawn as boxes
-          g.beginPath(); g.moveTo(s.ax, s.ay); g.lineTo(s.bx, s.by); g.stroke();
-        });
+        }
         // hubs and pivots
-        movers.forEach(function (m) {
-          if (m.kind === 'slider') return;
-          g.beginPath(); g.arc(m.x, m.y, m.kind === 'gate' ? 0.35 : 0.45, 0, 6.2832);
+        for (var mi = 0; mi < movers.length; mi++) {
+          var mv = movers[mi];
+          if (mv.kind === 'slider' || mv.y < y0 - 1 || mv.y > y1 + 1) continue;
+          g.beginPath(); g.arc(mv.x, mv.y, mv.kind === 'gate' ? 0.35 : 0.45, 0, 6.2832);
           g.fillStyle = 'rgba(255,227,154,.9)'; g.fill();
-        });
+        }
         // goal
-        g.fillStyle = 'rgba(255,227,154,.14)'; g.fillRect(0, GOAL_Y, WW, END_Y - GOAL_Y);
-        g.strokeStyle = 'rgba(255,227,154,.9)'; g.lineWidth = 0.14; g.setLineDash([0.6, 0.4]);
-        g.beginPath(); g.moveTo(0, GOAL_Y); g.lineTo(WW, GOAL_Y); g.stroke(); g.setLineDash([]);
-        g.font = '800 2.2px ' + BALL_FONT; g.textAlign = 'center'; g.textBaseline = 'middle';
-        g.fillStyle = 'rgba(255,227,154,.9)'; g.fillText('GOAL', WW / 2, GOAL_Y + 3.6);
-        courseLayer = c;
-        // minimap thumbnail
+        if (y1 > GOAL_Y) {
+          g.fillStyle = 'rgba(255,227,154,.14)'; g.fillRect(0, GOAL_Y, WW, END_Y - GOAL_Y);
+          g.strokeStyle = 'rgba(255,227,154,.9)'; g.lineWidth = mini ? 0.5 : 0.14;
+          if (!mini) g.setLineDash([0.6, 0.4]);
+          g.beginPath(); g.moveTo(0, GOAL_Y); g.lineTo(WW, GOAL_Y); g.stroke();
+          g.setLineDash([]);
+          if (!mini) {
+            g.font = '800 2.2px ' + BALL_FONT; g.textAlign = 'center'; g.textBaseline = 'middle';
+            g.fillStyle = 'rgba(255,227,154,.9)'; g.fillText('GOAL', WW / 2, GOAL_Y + 3.6);
+          }
+        }
+      }
+
+      // the whole course, once, at thumbnail size
+      function bakeMini() {
         var m = document.createElement('canvas');
-        m.width = Math.ceil(MINI.w * DPR); m.height = Math.ceil(MINI.h * DPR);
+        m.width = Math.max(1, Math.ceil(MINI.w * DPR)); m.height = Math.max(1, Math.ceil(MINI.h * DPR));
         var mg = m.getContext('2d');
         mg.fillStyle = 'rgba(3,11,26,.7)'; mg.fillRect(0, 0, m.width, m.height);
-        mg.drawImage(c, 0, 0, m.width, m.height);
+        mg.scale(m.width / WW, m.height / COURSE_H);
+        drawCourse(mg, 0, COURSE_H, true);
         miniLayer = m;
       }
 
@@ -2741,13 +2865,31 @@
         ctx.translate(W / 2, H / 2); ctx.scale(s, s); ctx.translate(-cam.x, -cam.y);
         // visible band of the course
         var top = cam.y - viewH / z / 2 - 2, bot = cam.y + viewH / z / 2 + 2;
-        if (courseLayer) {
-          var sy = Math.max(0, top), ey = Math.min(COURSE_H, bot);
-          if (ey > sy) ctx.drawImage(courseLayer, 0, sy * CPX, courseLayer.width, (ey - sy) * CPX, 0, sy, WW, ey - sy);
-        }
+        drawCourse(ctx, top, bot, false);
         if (!gateOpen) {
           ctx.strokeStyle = 'rgba(255,227,154,.6)'; ctx.lineWidth = 0.12;
           ctx.beginPath(); ctx.moveTo(0, HOPPER_Y); ctx.lineTo(WW, HOPPER_Y); ctx.stroke();
+        }
+        // the nozzles in the box floor, and their air while they are blowing
+        if (top < HOPPER_Y + 1) {
+          var blowing = (phase === 'shake' || phase === 'mixing');
+          for (var nz = 0; nz < NOZZLES.length; nz++) {
+            var N = NOZZLES[nz];
+            ctx.fillStyle = blowing ? 'rgba(255,227,154,.9)' : 'rgba(175,215,255,.5)';
+            ctx.fillRect(N.x - 0.5, HOPPER_Y - 0.18, 1, 0.22);
+            if (!blowing) continue;
+            var str = 0.55 + 0.45 * Math.sin(now * N.sp + N.ph);
+            ctx.lineWidth = 0.1; ctx.lineCap = 'round';
+            for (var q2 = 0; q2 < 3; q2++) {
+              var ph2 = ((now / 700) + q2 * 0.33 + nz * 0.21) % 1;
+              var sy2 = HOPPER_Y - ph2 * HOPPER_Y * (0.5 + 0.5 * str);
+              ctx.strokeStyle = 'rgba(190,225,255,' + (0.4 * (1 - ph2) * str).toFixed(2) + ')';
+              ctx.beginPath();
+              ctx.moveTo(N.x + (q2 - 1) * 0.35, sy2);
+              ctx.lineTo(N.x + (q2 - 1) * 0.35, sy2 - 0.9);
+              ctx.stroke();
+            }
+          }
         }
         // movers
         movers.forEach(function (m) {
