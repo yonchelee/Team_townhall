@@ -1600,7 +1600,7 @@
         // Laps of the same kinds of obstacle, each laid out differently. A
         // big field pushes itself down a long course; a handful of marbles
         // would straggle for minutes, so a small one gets a shorter course.
-        var laps = pool.length <= 40 ? 3 : 6;
+        var laps = pool.length <= 40 ? 2 : 4;
         for (var cyc = 0; cyc < laps; cyc++) {
           y = secPins(y, cyc === 0 ? 8 : 5, cyc % 2 === 0 ? [5, 13, 21] : [9, 17]);
           y = secRamps(y, 2, 1, cyc % 2 === 1);
