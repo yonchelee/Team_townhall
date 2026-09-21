@@ -299,6 +299,9 @@
   .drum-wrap--pin { aspect-ratio:3/4; }
   .drum-wrap--pin .drum-glow { inset:2% 8% 6%; border-radius:18%; }
   .drum-wrap--pin .winner-big { top:52%; }
+  /* the race board's name is only up for a moment, so it snaps in and out */
+  .drum-wrap--pin .winner-big {
+    transition:opacity .07s ease, transform .12s cubic-bezier(.2,1.5,.3,1); }
   /* the race board is a narrow portrait, so the finisher's name is sized to it */
   .drum-wrap--pin .wb-name { font-size:clamp(30px,4.6vw,86px); }
   .drum-wrap--pin .wb-dept { font-size:clamp(14px,1.5vw,26px); }
@@ -3032,11 +3035,12 @@
       }
 
       // ---------- draw lifecycle ----------
-      var roundTimer = null;
+      var roundTimer = null, nameTimer = null;
       function setShake(on) {
         if (on && phase !== 'idle' && phase !== 'won') return;
         if (!on && phase !== 'shake') return;
         clearTimeout(roundTimer); roundTimer = null;
+        clearTimeout(nameTimer); nameTimer = null;
         if (on && (phase === 'won' || gateOpen)) { gateOpen = false; spawnBalls(); }
         phase = on ? 'shake' : 'idle';
         if (on) ejected = null;
@@ -3053,6 +3057,7 @@
           return;
         }
         clearTimeout(roundTimer); roundTimer = null;
+        clearTimeout(nameTimer); nameTimer = null;
         ejected = null;
         // every race starts from a full, freshly shuffled box
         if (phase !== 'shake') { gateOpen = false; spawnBalls(); }
@@ -3082,12 +3087,14 @@
           winnerEl.innerHTML = '골인! 축하합니다';
         }
         if (b.rank <= RANKS) {
-          // 1등, 2등, … each takes the centre as it crosses the line
+          // 1등, 2등, … each flashes up in the centre as it crosses the line
           wbName.textContent = b.rank + '등 ' + b.ent.n;
           wbDept.textContent = 'No.' + b.ent.no + (b.ent.d ? ' · ' + b.ent.d : '');
+          clearTimeout(nameTimer);
           wrap.classList.remove('show-name');
           void wrap.offsetWidth;                    // restart the entrance animation
           wrap.classList.add('show-name');
+          nameTimer = setTimeout(function () { wrap.classList.remove('show-name'); }, 200);
         }
         if (b.rank <= winRank) addWinner(b.ent);
         if (ranks.length >= RANKS) endRace();
@@ -3241,6 +3248,7 @@
 
       function restore(list) {
         clearTimeout(roundTimer); roundTimer = null;
+        clearTimeout(nameTimer); nameTimer = null;
         phase = 'idle'; ejected = null; gateOpen = false;
         spinBtn.disabled = false;
         if (shakeBtn) { shakeBtn.disabled = false; shakeBtn.classList.remove('on'); shakeBtn.textContent = '공 흔들기'; }
