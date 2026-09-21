@@ -303,6 +303,33 @@
   .pinball:fullscreen .drum-wrap--pin,
   .pinball:-webkit-full-screen .drum-wrap--pin { width:auto; height:86vh; }
   .pinball:fullscreen .winner, .pinball:-webkit-full-screen .winner { min-height:0; }
+  /* the standings live on the right of the screen while fullscreen; the board
+     shifts left to make room for them */
+  .fs-ranks { display:none; }
+  .pinball:fullscreen, .pinball:-webkit-full-screen { position:relative; }
+  .pinball:fullscreen .drum-wrap--pin,
+  .pinball:-webkit-full-screen .drum-wrap--pin { margin-right:32vw; }
+  .pinball:fullscreen .fs-ranks, .pinball:-webkit-full-screen .fs-ranks {
+    display:flex; flex-direction:column; gap:1.4vh;
+    position:absolute; right:2.5vw; top:50%; transform:translateY(-50%);
+    width:33vw; padding:2vh 1.6vw; border-radius:20px;
+    background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.14);
+    -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); }
+  .fs-ranks__title { font-size:1.6vw; font-weight:700; letter-spacing:.14em;
+    color:rgba(190,215,255,.85); text-align:center; }
+  .fs-ranks ol { list-style:none; margin:0; padding:0;
+    display:flex; flex-direction:column; gap:1vh; }
+  .fs-ranks li { display:flex; align-items:center; gap:1.2vw;
+    padding:1.4vh 1.4vw; border-radius:16px; text-align:left;
+    background:rgba(30,111,208,.16); border:1px solid rgba(30,111,208,.4); }
+  .fs-ranks li.done { background:rgba(255,227,154,.15); border-color:rgba(255,227,154,.55); }
+  .fs-ranks li.done:first-child { background:rgba(255,227,154,.26); }
+  .fs-ranks .fr-no { flex:0 0 auto; min-width:3.4vw; font-size:1.8vw; font-weight:800;
+    color:rgba(200,222,255,.8); }
+  .fs-ranks li.done .fr-no { color:#FFE39A; }
+  .fs-ranks .fr-name { font-size:2.4vw; font-weight:800; color:#fff; line-height:1.1;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .fs-ranks .fr-dept { font-size:1.25vw; font-weight:600; color:rgba(196,224,255,.75); }
   .drum-wrap--pin .drum-glow { inset:2% 8% 6%; border-radius:18%; }
   .drum-wrap--pin .winner-big { top:52%; }
   /* the race board's name is only up for a moment, so it snaps in and out */
@@ -808,6 +835,10 @@
             <button class="spin-btn" id="pbSpinBtn">레이스 시작</button>
           </div>
           <div class="winner reveal" style="--d:.3s" id="pbWinner"></div>
+          <aside class="fs-ranks" id="pbFsRanks" aria-hidden="true">
+            <div class="fs-ranks__title">실시간 순위</div>
+            <ol id="pbRankListFs"></ol>
+          </aside>
         </div>
 
         <div class="draw-side draw-side--right">
@@ -1327,7 +1358,7 @@
       var rcMeta = $('pbRcMeta'), rcDept = $('pbRcDept');
       var boardEl = $('pbRosterBoard'), boardList = $('pbRosterList');
       var drawer = $('pbRosterDrawer'), openBtn = $('pbOpenRoster');
-      var rankList = $('pbRankList'), rankSel = $('pbWinRank');
+      var rankList = $('pbRankList'), rankSel = $('pbWinRank'), fsList = $('pbRankListFs');
 
       var MAX_BALLS = 1500;
       var STORE = 'luckydraw.roster';    // shared with the drum: one roster serves both games
@@ -1569,7 +1600,7 @@
         // Laps of the same kinds of obstacle, each laid out differently. A
         // big field pushes itself down a long course; a handful of marbles
         // would straggle for minutes, so a small one gets a shorter course.
-        var laps = pool.length <= 40 ? 2 : 4;
+        var laps = pool.length <= 40 ? 3 : 6;
         for (var cyc = 0; cyc < laps; cyc++) {
           y = secPins(y, cyc === 0 ? 8 : 5, cyc % 2 === 0 ? [5, 13, 21] : [9, 17]);
           y = secRamps(y, 2, 1, cyc % 2 === 1);
@@ -2078,7 +2109,7 @@
         // The places already home, then whoever is racing for the rest. The
         // side panel is out of sight while a race runs fullscreen, so this is
         // where the room reads the result.
-        if (phase === 'race' || phase === 'won') {
+        if ((phase === 'race' || phase === 'won') && !document.fullscreenElement) {
           var lead = phase === 'race' ? leaders(Math.max(0, RANKS - ranks.length)) : [];
           var rows = ranks.length + Math.min(3, lead.length);
           if (rows) {
@@ -2145,7 +2176,7 @@
         cam.x += (cam.tx - cam.x) * k; cam.y += (cam.ty - cam.y) * k; cam.z += (cam.tz - cam.z) * k * 0.7;
       }
 
-      var last = 0;
+      var last = 0, lastFs = 0;
       function frame(t) {
         if (!last) last = t;
         var dt = Math.min((t - last) / 1000, 0.033);
@@ -2156,8 +2187,11 @@
           winnerEl.innerHTML = '레이스 진행 중';
           renderRanks(false);
         } else if (phase === 'race' && ranks.length &&
-                   (t - firstAt > (basePool.length <= 40 ? 150000 : RACE_TAIL_MS) || !stillRunning())) {
+                   (t - firstAt > (basePool.length <= 40 ? 240000 : RACE_TAIL_MS) || !stillRunning())) {
           endRace();
+        }
+        if (phase === 'race' && document.fullscreenElement && t - lastFs > 250) {
+          renderFsRanks(); lastFs = t;
         }
         step(dt, t);
         updateCamera(dt);
@@ -2281,7 +2315,41 @@
       }
 
       // ---------- finishing order ----------
+      // the fullscreen board: places already home, then whoever is running
+      // for the rest, refreshed a few times a second while the race is on
+      function renderFsRanks() {
+        if (!fsList) return;
+        var lead = phase === 'race' ? leaders(Math.max(0, RANKS - ranks.length)) : [];
+        var frag = document.createDocumentFragment();
+        function row(no, ent, done) {
+          var li = document.createElement('li');
+          if (done) li.className = 'done';
+          var n = document.createElement('span');
+          n.className = 'fr-no'; n.textContent = no;
+          li.appendChild(n);
+          var tx = document.createElement('span');
+          tx.className = 'fr-text';
+          var nm = document.createElement('span');
+          nm.className = 'fr-name'; nm.textContent = ent.n;
+          tx.appendChild(nm);
+          var dp = document.createElement('span');
+          dp.className = 'fr-dept';
+          dp.textContent = 'No.' + ent.no + (ent.d ? ' · ' + ent.d : '');
+          tx.appendChild(document.createElement('br'));
+          tx.appendChild(dp);
+          li.appendChild(tx);
+          frag.appendChild(li);
+        }
+        ranks.forEach(function (b, i) { row((i + 1) + '등', b.ent, true); });
+        for (var i = 0; i < lead.length && ranks.length + i < RANKS; i++) {
+          row('·', lead[i].ent, false);
+        }
+        fsList.innerHTML = '';
+        fsList.appendChild(frag);
+      }
+
       function renderRanks(teleportLast) {
+        renderFsRanks();
         if (!rankList) return;
         rankList.innerHTML = '';
         if (!ranks.length) {
