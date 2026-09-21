@@ -295,6 +295,14 @@
   .pinball { flex:0 0 auto; width:min(54vh,40vw); display:flex;
     flex-direction:column; align-items:center; gap:1.3vh; }
   .drum-wrap--pin { aspect-ratio:3/4; }
+  /* a race runs fullscreen: the column becomes the screen and the board
+     keeps its portrait shape inside it */
+  .pinball:fullscreen, .pinball:-webkit-full-screen {
+    width:100vw; height:100vh; background:#02070F; justify-content:center;
+    gap:2vh; padding:2vh 0; }
+  .pinball:fullscreen .drum-wrap--pin,
+  .pinball:-webkit-full-screen .drum-wrap--pin { width:auto; height:86vh; }
+  .pinball:fullscreen .winner, .pinball:-webkit-full-screen .winner { min-height:0; }
   .drum-wrap--pin .drum-glow { inset:2% 8% 6%; border-radius:18%; }
   .drum-wrap--pin .winner-big { top:52%; }
   /* the race board's name is only up for a moment, so it snaps in and out */
@@ -896,6 +904,7 @@
         slides[current].id === 'pinball-content');
       // the closing video plays when its slide arrives and rests when it leaves
       if (typeof closingVideoOn === 'function') closingVideoOn(slides[current].id === 'closing');
+      if (typeof raceFullOn === 'function') raceFullOn(slides[current].id === 'pinball-content');
       pushRemote();
 
       // Cinematic depth: the focused slide sits forward, sharp and lit;
@@ -994,6 +1003,7 @@
       if (tg && /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName)) return;
       var dr = document.getElementById('pbRosterDrawer');
       if (dr && dr.classList.contains('open')) return;
+      if (document.fullscreenElement) return;   // a fullscreen race owns the keys
       if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].indexOf(e.key) !== -1) {
         e.preventDefault(); next();
       } else if (['ArrowLeft', 'ArrowUp', 'PageUp'].indexOf(e.key) !== -1) {
@@ -1292,6 +1302,8 @@
       }, 3400);
     }
 
+
+    var raceFullOn = null;    // the carousel uses this to drop fullscreen when it leaves
 
     // ----- Lucky Drop: a marble race down a long course, first home wins -----
     // The same fairness rules as the drum. Every entrant is a marble in the
@@ -2063,17 +2075,27 @@
         }
         ctx.restore();
 
-        // live leaders
+        // The places already home, then whoever is racing for the rest. The
+        // side panel is out of sight while a race runs fullscreen, so this is
+        // where the room reads the result.
         if (phase === 'race' || phase === 'won') {
-          var lead = phase === 'race' ? leaders(3) : [];
-          if (lead.length) {
-            ctx.font = '700 12px ' + BALL_FONT; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-            var pw = 150, ph = 14 + lead.length * 18;
-            ctx.fillStyle = 'rgba(3,11,26,.55)';
+          var lead = phase === 'race' ? leaders(Math.max(0, RANKS - ranks.length)) : [];
+          var rows = ranks.length + Math.min(3, lead.length);
+          if (rows) {
+            var fs3 = Math.max(12, Math.round(W * 0.022));
+            ctx.font = '700 ' + fs3 + 'px ' + BALL_FONT;
+            ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+            var lh = Math.round(fs3 * 1.5), pw = Math.round(fs3 * 13), ph = 12 + rows * lh;
+            ctx.fillStyle = 'rgba(3,11,26,.6)';
             ctx.beginPath(); ctx.rect(10, 10, pw, ph); ctx.fill();
-            for (var L = 0; L < lead.length; L++) {
-              ctx.fillStyle = L === 0 ? '#FFE39A' : 'rgba(232,242,255,.9)';
-              ctx.fillText((L + 1) + '  ' + lead[L].ent.n + '  No.' + lead[L].ent.no, 18, 19 + L * 18);
+            var row = 0;
+            for (var fi = 0; fi < ranks.length; fi++, row++) {
+              ctx.fillStyle = fi === 0 ? '#FFE39A' : 'rgba(255,227,154,.8)';
+              ctx.fillText((fi + 1) + '등  ' + ranks[fi].ent.n, 18, 17 + row * lh + lh / 2);
+            }
+            for (var L = 0; L < lead.length && L < 3; L++, row++) {
+              ctx.fillStyle = 'rgba(200,222,255,.75)';
+              ctx.fillText('· ' + lead[L].ent.n + '  No.' + lead[L].ent.no, 18, 17 + row * lh + lh / 2);
             }
           }
         }
@@ -2143,6 +2165,24 @@
         requestAnimationFrame(frame);
       }
 
+      // ---------- fullscreen ----------
+      // A race takes over the screen from 레이스 시작 until the fifth marble is
+      // home. The canvas is re-measured on the way in and out.
+      var stage = wrap.parentNode;
+      function enterFull() {
+        var rf = stage.requestFullscreen || stage.webkitRequestFullscreen;
+        if (rf && !document.fullscreenElement) { try { rf.call(stage); } catch (err) {} }
+      }
+      function leaveFull() {
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(function () {});
+        }
+      }
+      document.addEventListener('fullscreenchange', function () {
+        setTimeout(function () { layout(); }, 60);
+      });
+      raceFullOn = function (onSlide) { if (!onSlide) leaveFull(); };
+
       // ---------- draw lifecycle ----------
       var roundTimer = null, nameTimer = null;
       function setShake(on) {
@@ -2177,6 +2217,7 @@
         if (shakeBtn) { shakeBtn.disabled = true; shakeBtn.classList.remove('on'); shakeBtn.textContent = '공 흔들기'; }
         wrap.classList.add('is-mixing');
         winnerEl.innerHTML = '섞는 중…';
+        enterFull();
       }
 
       // called from clampStatics each time a marble's centre crosses the goal;
@@ -2226,6 +2267,7 @@
         spinBtn.disabled = false;
         if (shakeBtn) shakeBtn.disabled = false;
         if (ranks.length < RANKS) renderRanks(false);
+        leaveFull();                       // the board goes back into the page
         roundTimer = setTimeout(function () {
           if (phase !== 'won') return;
           ejected = null;
@@ -2358,6 +2400,7 @@
       function restore(list) {
         clearTimeout(roundTimer); roundTimer = null;
         clearTimeout(nameTimer); nameTimer = null;
+        leaveFull();
         phase = 'idle'; ejected = null; gateOpen = false;
         spinBtn.disabled = false;
         if (shakeBtn) { shakeBtn.disabled = false; shakeBtn.classList.remove('on'); shakeBtn.textContent = '공 흔들기'; }
