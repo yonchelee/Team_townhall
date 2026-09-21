@@ -2358,7 +2358,7 @@
           var j = Math.floor(Math.random() * (k + 1));
           var tmp = order[k]; order[k] = order[j]; order[j] = tmp;
         }
-        var cols = Math.max(1, Math.floor((WW - BR * 2) / (BR * 2.05)));
+        var cols = Math.max(1, Math.floor((WW - BR * 2 - 0.4) / (BR * 2.05)));
         for (var p = 0; p < n; p++) {
           var ent = pool[order[p]];
           var row = Math.floor(p / cols), col = p % cols;
@@ -2393,6 +2393,23 @@
         boxes.push({ x: cx, y: cy, w: w, h: h, rot: rot });
       }
       var boxes = [];
+
+      // The side walls used to be flat, and a marble that reached one rode it
+      // straight down past everything. They now zigzag: a shallow sawtooth,
+      // out of phase left and right. A marble is turned back into the field
+      // wherever it touches, and because no face is steeper than about ten
+      // degrees off vertical there is nowhere for it to rest.
+      var WALL_AMP = 1.0, WALL_PER = 13;
+      function wallOff(y) {
+        if (y <= HOPPER_Y) return 0;
+        var t = ((y - HOPPER_Y) % WALL_PER) / WALL_PER;
+        return WALL_AMP * (t < 0.5 ? t * 2 : (1 - t) * 2);
+      }
+      function wallSlope(y) {                    // dx/dy of the left wall
+        if (y <= HOPPER_Y) return 0;
+        var t = ((y - HOPPER_Y) % WALL_PER) / WALL_PER;
+        return (t < 0.5 ? 1 : -1) * 2 * WALL_AMP / WALL_PER;
+      }
 
       // ---- course sections; each takes the y it starts at and returns the
       // y the next one starts at, so the course is assembled down the page
@@ -2443,8 +2460,10 @@
       }
 
       function secSliders(y, ph) {
-        movers.push({ kind: 'slider', x: 7, y: y + 2, len: 5, w: 0.35, amp: 3.6, period: 3.1, ph: ph, sx: 7, vx: 0 });
-        movers.push({ kind: 'slider', x: 19, y: y + 2, len: 5, w: 0.35, amp: 3.6, period: 3.7, ph: ph + 2.1, sx: 19, vx: 0 });
+        movers.push({ kind: 'slider', x: 7, y: y + 2, len: 5, w: 0.35, amp: 3.6, period: 3.1,
+                      ph: ph, sx: 7, vx: 0, tl: 0.5 });
+        movers.push({ kind: 'slider', x: 19, y: y + 2, len: 5, w: 0.35, amp: 3.6, period: 3.7,
+                      ph: ph + 2.1, sx: 19, vx: 0, tl: -0.5 });
         return y + 6;
       }
 
@@ -2486,16 +2505,19 @@
       function buildCourse() {
         segs = []; circles = []; movers = []; boxes = [];
         var y = HOPPER_Y + 3;
-        // four laps of the same kinds of obstacle, each laid out differently
-        for (var cyc = 0; cyc < 4; cyc++) {
+        // Laps of the same kinds of obstacle, each laid out differently. A
+        // big field pushes itself down a long course; a handful of marbles
+        // would straggle for minutes, so a small one gets a shorter course.
+        var laps = pool.length <= 40 ? 2 : 4;
+        for (var cyc = 0; cyc < laps; cyc++) {
           y = secPins(y, cyc === 0 ? 8 : 5, cyc % 2 === 0 ? [5, 13, 21] : [9, 17]);
           y = secRamps(y, 2, 1, cyc % 2 === 1);
           y = secWheels(y, cyc % 2 === 0);
           y = secSliders(y, cyc * 1.3);
           y = secSplit(y, cyc % 2 === 0);
-          y = secDiamonds(y, cyc === 3 ? 2 : 3);
+          y = secDiamonds(y, cyc === laps - 1 ? 2 : 3);
           y = secPins(y, 4, cyc % 2 === 0 ? [9, 17] : [5, 13, 21]);
-          if (cyc === 1) y = secWheels(y, false);
+          if (cyc === 1 && laps > 2) y = secWheels(y, false);
         }
         // the last funnel, then the home straight and the goal line
         y = secFunnel(y, true);
@@ -2508,6 +2530,12 @@
           }
         }
         GOAL_Y = y + 13; END_Y = GOAL_Y + 9; COURSE_H = END_Y + 3;
+
+        // anything buried in a wall's bulge is unreachable, so drop it
+        circles = circles.filter(function (o) {
+          return o.x > wallOff(o.y) + 0.1 && o.x < WW - wallOff(o.y + WALL_PER / 2) - 0.1;
+        });
+
         // A pin or bumper sitting against a sloping wall makes a notch a
         // marble can wedge into for good, so clear a lane beside every wall.
         var walls = segs.filter(function (sg) { return !sg.box; });
@@ -2615,10 +2643,12 @@
           sg = seg(m.x, m.y, m.x + c * m.len, m.y + sn * m.len, 0.3);
           hitSeg(b, sg, -m.om * (b.y - m.y), m.om * (b.x - m.x));
         } else if (m.kind === 'slider') {
-          sg = seg(m.sx - m.len / 2, m.y, m.sx + m.len / 2, m.y, 0.3);
+          sg = seg(m.sx - m.len / 2, m.y - m.tl, m.sx + m.len / 2, m.y + m.tl, 0.3);
           hitSeg(b, sg, m.vx, 0);
-          // riding on the shelf: friction drags the marble along with it
-          if (Math.abs(b.x - m.sx) < m.len / 2 + b.r && b.y < m.y && m.y - b.y < b.r + TH + 0.08) {
+          // riding on the shelf: friction drags the marble along with it, and
+          // the shelf's tilt means it always rolls off one end
+          var surf = m.y + m.tl * ((b.x - m.sx) / (m.len / 2));
+          if (Math.abs(b.x - m.sx) < m.len / 2 + b.r && b.y < surf && surf - b.y < b.r + TH + 0.1) {
             b.vx += (m.vx - b.vx) * 0.2;
           }
         }
@@ -2676,8 +2706,23 @@
         for (var i = 0; i < balls.length; i++) {
           var b = balls[i];
           if (b.done) continue;
-          if (b.x < b.r) { b.x = b.r; if (b.vx < 0) b.vx *= -0.4; }
-          if (b.x > WW - b.r) { b.x = WW - b.r; if (b.vx > 0) b.vx *= -0.4; }
+          // The wall only ever acts sideways: it never takes anything off a
+          // marble's fall, so nothing can come to rest against it. Where the
+          // wall bulges inward it throws a falling marble back into the field.
+          var lw = wallOff(b.y) + b.r;
+          if (b.x < lw) {
+            var ls = wallSlope(b.y);
+            b.x = lw;
+            if (b.vx < 0) b.vx *= -0.35;
+            if (ls > 0 && b.vy > 0) b.vx += ls * b.vy * 0.9;
+          }
+          var rw = WW - wallOff(b.y + WALL_PER / 2) - b.r;
+          if (b.x > rw) {
+            var rs = wallSlope(b.y + WALL_PER / 2);
+            b.x = rw;
+            if (b.vx > 0) b.vx *= -0.35;
+            if (rs > 0 && b.vy > 0) b.vx -= rs * b.vy * 0.9;
+          }
           if (b.y < b.r) { b.y = b.r; if (b.vy < 0) b.vy *= -0.4; }
           if (b.above) {
             if (gateOpen) { if (b.y > HOPPER_Y - b.r) b.above = false; }
@@ -2698,7 +2743,10 @@
 
       function step(dt, now) {
         var shaking = (phase === 'shake' || phase === 'mixing');
-        var G = 19, VMAX = shaking ? 46 : 30;   // the blower throws harder than the course does
+        // a big field pushes itself along; a handful of marbles has nothing to
+        // shove it, so a small field runs on a steeper hill
+        var small = pool.length <= 60;
+        var G = small ? 32 : 22, VMAX = shaking ? 46 : (small ? 42 : 33);   // the blower throws harder than the course does
         // the start box is an air-mix chamber: six nozzles along the floor,
         // each breathing at its own rate, so plumes rise in several places at
         // once and the pile keeps turning over instead of circulating one way
@@ -2776,6 +2824,16 @@
           g.fillStyle = 'rgba(8,24,52,.4)';
           g.fillRect(0, y0, WW, Math.min(HOPPER_Y, y1) - y0);
         }
+        // the zigzag side walls
+        var step = mini ? 4 : 1;
+        g.beginPath(); g.moveTo(0, y0);
+        for (var wy = y0; wy <= y1; wy += step) g.lineTo(wallOff(wy), wy);
+        g.lineTo(wallOff(y1), y1); g.lineTo(0, y1); g.closePath();
+        g.fillStyle = 'rgba(110,165,235,.22)'; g.fill();
+        g.beginPath(); g.moveTo(WW, y0);
+        for (var wy2 = y0; wy2 <= y1; wy2 += step) g.lineTo(WW - wallOff(wy2 + WALL_PER / 2), wy2);
+        g.lineTo(WW - wallOff(y1 + WALL_PER / 2), y1); g.lineTo(WW, y1); g.closePath();
+        g.fill();
         // funnel and lane walls
         g.strokeStyle = 'rgba(175,215,255,.6)'; g.lineWidth = mini ? 0.3 : 0.18; g.lineCap = 'round';
         for (var si = 0; si < segs.length; si++) {
@@ -2910,10 +2968,11 @@
             ctx.fillStyle = m.om === 0 && m.a === m.closed ? 'rgba(255,179,199,.9)' : 'rgba(255,227,154,.85)';
             ctx.fillRect(0, -m.w / 2, m.len, m.w);
           } else if (m.kind === 'slider') {
+            ctx.translate(m.sx, m.y); ctx.rotate(Math.atan2(m.tl * 2, m.len));
             ctx.fillStyle = 'rgba(127,216,232,.85)';
-            ctx.fillRect(m.sx - m.len / 2, m.y - m.w / 2, m.len, m.w);
+            ctx.fillRect(-m.len / 2, -m.w / 2, m.len, m.w);
             ctx.fillStyle = 'rgba(3,11,26,.6)';
-            for (var q = -1; q <= 1; q++) ctx.fillRect(m.sx + q * 1.2 - 0.08, m.y - m.w / 2 + 0.06, 0.16, m.w - 0.12);
+            for (var q = -1; q <= 1; q++) ctx.fillRect(q * 1.2 - 0.08, -m.w / 2 + 0.06, 0.16, m.w - 0.12);
           }
           ctx.restore();
         });
@@ -3259,7 +3318,7 @@
         if (list) basePool = list;
         basePool.forEach(function (e, i) { e.no = i + 1; });
         pool = basePool.slice();
-        sizeBalls();
+        layout();                 // the course is built to suit the field size
         spawnBalls();
         renderBoard();
         renderWinners();
