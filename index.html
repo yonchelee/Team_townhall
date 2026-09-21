@@ -2277,7 +2277,7 @@
 
       // The course is laid out in world units; the canvas is a camera on it.
       var WW = 26;                       // course width
-      var HOPPER_Y = 9;                  // start-box floor
+      var HOPPER_Y = 14;                 // start-box floor, with room above the pile to boil
       var GOAL_Y = 324, END_Y = 333, COURSE_H = 336;   // set by buildCourse
 
       var basePool = [
@@ -2485,7 +2485,7 @@
 
       function buildCourse() {
         segs = []; circles = []; movers = []; boxes = [];
-        var y = 12;
+        var y = HOPPER_Y + 3;
         // four laps of the same kinds of obstacle, each laid out differently
         for (var cyc = 0; cyc < 4; cyc++) {
           y = secPins(y, cyc === 0 ? 8 : 5, cyc % 2 === 0 ? [5, 13, 21] : [9, 17]);
@@ -2698,11 +2698,11 @@
 
       function step(dt, now) {
         var shaking = (phase === 'shake' || phase === 'mixing');
-        var G = 19, VMAX = 30;
+        var G = 19, VMAX = shaking ? 46 : 30;   // the blower throws harder than the course does
         // the start box is an air-mix chamber: six nozzles along the floor,
         // each breathing at its own rate, so plumes rise in several places at
         // once and the pile keeps turning over instead of circulating one way
-        var JET = shaking ? 70 : 0;
+        var JET = shaking ? 210 : 0;
         var rattle = (phase === 'race' && now - holeAt > 100000 && ((now - holeAt) % 4000) < 700);
         var h = dt / substeps;
         for (var sub = 0; sub < substeps; sub++) {
@@ -2720,14 +2720,14 @@
                 var ox = b.x - N.x;
                 if (ox > pw * 2.5 || ox < -pw * 2.5) continue;
                 var str = JET * (0.5 + 0.5 * Math.sin(now * N.sp + N.ph));
-                var e2 = Math.exp(-(ox * ox) / (pw * pw)) * Math.max(0, 1.2 - hh);
+                var e2 = Math.exp(-(ox * ox) / (pw * pw)) * Math.max(0, 1.15 - hh * 2.2);
                 lift += str * e2;
                 drift += (ox / pw) * str * e2 * 0.2;                // air spills sideways as it rises
               }
               b.vy -= lift * h; b.vx += drift * h;
               if (b.x < 1.5) b.vx += 8 * h;                         // walls nudge marbles back in
               if (b.x > WW - 1.5) b.vx -= 8 * h;
-              b.vx += (Math.random() - 0.5) * 34 * h; b.vy += (Math.random() - 0.5) * 34 * h;
+              b.vx += (Math.random() - 0.5) * 70 * h; b.vy += (Math.random() - 0.5) * 70 * h;
             }
             if (inBox && !shaking && b.above) { b.vx *= 0.96; b.vy *= 0.96; }
             else b.vx += (Math.random() - 0.5) * 6 * h;
@@ -2889,7 +2889,7 @@
               ctx.strokeStyle = 'rgba(190,225,255,' + (0.4 * (1 - ph2) * str).toFixed(2) + ')';
               ctx.beginPath();
               ctx.moveTo(N.x + (q2 - 1) * 0.35, sy2);
-              ctx.lineTo(N.x + (q2 - 1) * 0.35, sy2 - 0.9);
+              ctx.lineTo(N.x + (q2 - 1) * 0.35, sy2 - 1.5);
               ctx.stroke();
             }
           }
@@ -3025,7 +3025,8 @@
           gateOpen = true;
           winnerEl.innerHTML = '레이스 진행 중';
           renderRanks(false);
-        } else if (phase === 'race' && ranks.length && (t - firstAt > RACE_TAIL_MS || !stillRunning())) {
+        } else if (phase === 'race' && ranks.length &&
+                   (t - firstAt > (basePool.length <= 40 ? 150000 : RACE_TAIL_MS) || !stillRunning())) {
           endRace();
         }
         step(dt, t);
