@@ -2001,6 +2001,7 @@
 
       function leaders(n) {
         var top = [];
+        if (n <= 0) return top;          // every place is taken: nobody to list
         for (var i = 0; i < balls.length; i++) {
           var b = balls[i];
           if (b.done || b.above) continue;
