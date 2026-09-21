@@ -516,6 +516,10 @@
   .video-play__label { font-size:clamp(14px,1.3vw,20px); font-weight:600; letter-spacing:.1em; }
   .video-play:hover { transform:translate(-50%,-50%) scale(1.05); }
   .slide--video.playing .video-play { opacity:0; pointer-events:none; }
+  /* started muted because the browser refused sound: the button stays up */
+  .slide--video.playing.silent .video-play { opacity:.92; pointer-events:auto;
+    padding:14px 22px; }
+  .slide--video.playing.silent .video-play__icon { font-size:clamp(22px,2.4vw,36px); }
   .slide--video:fullscreen video { object-fit:contain; }
 
   /* ===== Link button (사내 깃헙 연결) ===== */
@@ -935,6 +939,10 @@
         slides[current].id === 'pinball-content');
       // the closing video plays when its slide arrives and rests when it leaves
       if (typeof closingVideoOn === 'function') closingVideoOn(slides[current].id === 'closing');
+      if (typeof embedVideoOn === 'function') {
+        embedVideoOn(slides[current].id === 'video-content' ? 'play'
+                   : slides[current].id === 'video' ? 'warm' : 'off');
+      }
       if (typeof raceFullOn === 'function') raceFullOn(slides[current].id === 'pinball-content');
       pushRemote();
 
@@ -1166,10 +1174,24 @@
       var v = document.getElementById('closingVideo');
       var btn = document.getElementById('closingPlay');
       if (!sec || !v || !btn) return null;
+      var label = btn.querySelector('.video-play__label');
       function setPlaying(on) { sec.classList.toggle('playing', on); }
-      function tryPlay() {
+      // A browser will refuse to start a video with sound on its own. Ask for
+      // sound first; if that is refused, start it muted — the picture always
+      // runs — and offer one click to turn the sound on.
+      function tryPlay(withSound) {
+        v.muted = !withSound;
         var p = v.play();
-        if (p && p.then) p.then(function () { setPlaying(true); }).catch(function () { setPlaying(false); });
+        if (!p || !p.then) { setPlaying(true); return; }
+        p.then(function () {
+          setPlaying(true);
+          sec.classList.toggle('silent', v.muted);
+          if (v.muted) label.textContent = '소리 켜기';
+        }).catch(function () {
+          if (withSound) { tryPlay(false); return; }   // second try, muted
+          setPlaying(false);
+          label.textContent = '재생';
+        });
       }
       function goFull() {
         var el = sec;
@@ -1183,21 +1205,56 @@
       }
       btn.addEventListener('click', function (e) {
         e.stopPropagation();
-        tryPlay(); goFull();
+        v.muted = false; sec.classList.remove('silent');
+        label.textContent = '재생';
+        tryPlay(true); goFull();
       });
       sec.addEventListener('click', function () {
-        if (v.paused) { tryPlay(); goFull(); }
-        else { v.pause(); setPlaying(false); }
+        if (v.paused || v.muted) {
+          v.muted = false; sec.classList.remove('silent');
+          label.textContent = '재생';
+          tryPlay(true); goFull();
+        } else { v.pause(); setPlaying(false); }
       });
       v.addEventListener('play', function () { setPlaying(true); });
       v.addEventListener('pause', function () { setPlaying(false); });
       v.addEventListener('ended', function () {
         setPlaying(false); leaveFull();
-        btn.querySelector('.video-play__label').textContent = '다시 재생';
+        sec.classList.remove('silent');
+        label.textContent = '다시 재생';
       });
       return function (active) {
-        if (active) { v.currentTime = 0; tryPlay(); }
-        else { if (!v.paused) v.pause(); setPlaying(false); leaveFull(); }
+        if (active) { v.currentTime = 0; tryPlay(true); }
+        else {
+          if (!v.paused) v.pause();
+          setPlaying(false); sec.classList.remove('silent'); leaveFull();
+        }
+      };
+    })();
+
+    // ----- the embedded video page -----
+    // Nothing on this side can press play inside another site's frame, so the
+    // frame is reloaded with an autoplay hint when the slide arrives (the page
+    // itself decides what to do with it) and blanked when it leaves, which
+    // stops whatever is playing behind the deck.
+    var embedVideoOn = (function () {
+      var sec = document.getElementById('video-content');
+      if (!sec) return null;
+      var fr = sec.querySelector('iframe');
+      if (!fr) return null;
+      var base = fr.getAttribute('src');
+      var state = '';
+      fr.removeAttribute('src');
+      return function (where) {
+        if (state === where) return;
+        state = where;
+        if (where === 'play') {
+          fr.src = base + (base.indexOf('?') < 0 ? '?' : '&') + 'autoplay=1&muted=1';
+        } else if (where === 'warm') {
+          fr.src = base;                 // the title slide: load it ready to go
+        } else {
+          fr.removeAttribute('src');
+        }
       };
     })();
 
